@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: seo-redirect-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
+      - JWT_EXPIRES_IN=7d
+      - DATABASE_PATH=/app/data/redirects.db
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
+    volumes:
+      - backend_data:/app/data
+    networks:
+      - redirect-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend (served by nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: seo-redirect-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - redirect-network
+
+  # OpenResty for redirects
+  redirector:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: seo-redirector
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/lua:/etc/nginx/lua:ro
+      - nginx_logs:/var/log/nginx
+      - letsencrypt:/etc/letsencrypt
+    depends_on:
+      - backend
+    networks:
+      - redirect-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  backend_data:
+  nginx_logs:
+  letsencrypt:
+
+networks:
+  redirect-network:
+    driver: bridge

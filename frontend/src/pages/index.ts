@@ -1,0 +1,9 @@
+export { LoginPage } from './LoginPage';
+export { DashboardPage } from './DashboardPage';
+export { DomainsPage } from './DomainsPage';
+export { DomainDetailPage } from './DomainDetailPage';
+export { ProjectsPage } from './ProjectsPage';
+export { ProjectDetailPage } from './ProjectDetailPage';
+export { RedirectsPage } from './RedirectsPage';
+export { BacklinksPage } from './BacklinksPage';
+export { ExportPage } from './ExportPage';

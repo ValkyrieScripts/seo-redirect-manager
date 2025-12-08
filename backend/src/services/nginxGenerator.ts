@@ -101,10 +101,13 @@ export async function generateAllNginxConfigs(): Promise<void> {
     console.log(`Generated nginx config for ${domain.domain_name}`);
   }
 
+  // Protected config files (don't delete these)
+  const protectedFiles = new Set(['skuldpath.conf']);
+
   // Remove config files for inactive/deleted domains
   const existingFiles = fs.readdirSync(NGINX_CONF_DIR);
   for (const file of existingFiles) {
-    if (file.endsWith('.conf') && !expectedFiles.has(file)) {
+    if (file.endsWith('.conf') && !expectedFiles.has(file) && !protectedFiles.has(file)) {
       fs.unlinkSync(path.join(NGINX_CONF_DIR, file));
       console.log(`Removed nginx config: ${file}`);
     }

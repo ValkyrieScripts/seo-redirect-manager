@@ -10,6 +10,9 @@ their SEO backlink value. When you acquire an expired domain that has existing
 backlinks pointing to it, this tool redirects all traffic to your target site,
 passing along the "link juice" for SEO benefits.
 
+SEO tools (Ahrefs, Moz, SEMrush) are automatically blocked so they can't detect
+the redirects, while search engines (Google, Bing) receive the 301 redirect.
+
 
 HOW IT WORKS
 ------------
@@ -18,61 +21,102 @@ HOW IT WORKS
 3. Point the domain's DNS to this server (via Cloudflare)
 4. All traffic to the expired domain gets 301 redirected to your target
 5. Search engines follow the redirect and pass link authority to your site
+6. SEO tools see 404 (domain appears dead to them)
 
 
 FEATURES
 --------
-• Add domains with a single target URL (all paths redirect to one destination)
-• Cloudflare DNS setup instructions shown after adding domain
-• Upload backlinks CSV/TXT to track which sites link to your domain
-• View backlinks grouped by URL path with counts
-• Expandable list showing all linking sites per path
-• Activate/deactivate redirects per domain
-• Simple dark theme dashboard
+- Full Domain Redirect: All paths redirect to target URL
+- Path-Specific Redirect: Only backlink paths redirect (more control)
+- SEO Tool Blocking: Returns 404 to Ahrefs, Moz, SEMrush, etc.
+- Backlink Import: Paste CSV format (linking_url,path)
+- Cloudflare Integration: Masks origin IP from detection
+- Dark theme dashboard with instructions
 
 
 TYPICAL WORKFLOW
 ----------------
-1. Login to dashboard (admin / 1509)
+1. Login to dashboard
+   URL: https://skuldpath.com
+   Default: admin / 1509
 
 2. Click "Add Domain"
    - Enter the expired domain name (e.g., old-expired-site.com)
    - Enter your target URL (e.g., https://mysite.com)
+   - Choose redirect mode:
+     * Full Domain: All paths redirect
+     * Path-Specific: Only imported backlink paths redirect
    - Click Add
 
 3. Configure Cloudflare DNS
-   - Go to Cloudflare for the domain
-   - Add A record: @ -> 89.147.108.50 (proxied)
-   - Add A record: www -> 89.147.108.50 (proxied)
-   - Set SSL mode to "Full"
+   - Add domain to Cloudflare (if not already)
+   - Add A record: @ -> 89.147.108.50 (Proxied - orange cloud)
+   - Add A record: www -> 89.147.108.50 (Proxied - orange cloud)
+   - Set SSL/TLS mode to "Flexible" (IMPORTANT!)
 
-4. Upload backlinks (optional, for tracking)
+4. Import backlinks (optional, for path-specific mode)
    - Get backlink data from Ahrefs, Moz, or similar tool
-   - Format as CSV: linking_site,url_path
+   - Format as CSV: full_linking_url,path_on_expired_domain
    - Example:
-     highauthority.com,/old-article
-     blogger.net,/best-guide
-     news-site.org,/
-   - Upload via the domain detail page
+     https://blog.example.com/post-about-topic,/old-article
+     https://news-site.org/article,/best-guide
+     https://forum.net/thread/123,/
+   - Paste via the domain detail page
 
-5. Monitor
-   - View which paths have the most backlinks
-   - Expand paths to see all linking domains
-   - Track total backlink count per domain
+5. Activate the domain
+   - Toggle status to "Active"
+   - Nginx config is auto-generated
+
+6. Send linking URLs to indexer
+   - Copy linking URLs from dashboard
+   - Submit to Google Search Console or indexing service
+   - This triggers Google to re-crawl and discover the redirect
 
 
 FILE FORMAT FOR BACKLINK IMPORT
 -------------------------------
-CSV or TXT file with two columns:
-  linking_site,url_path
+CSV format with two columns:
+  linking_url,path
 
 Examples:
-  example.com,/some-page
-  blog.site.org,/article-title
-  news.com,/
+  https://blog.example.com/some-post,/old-page
+  https://news-site.org/article-title,/another-page
+  https://forum.net/thread,/
 
-The url_path is the path on YOUR expired domain that the external site links to.
-The linking_site is the domain that contains the backlink.
+- linking_url: Full URL of page containing backlink (for indexing)
+- path: Path on expired domain that the backlink points to
+
+
+REDIRECT MODES
+--------------
+Full Domain:
+  - All paths (/*) redirect to target URL
+  - Simple, catches everything
+  - Best when you don't need granular control
+
+Path-Specific:
+  - Only paths with imported backlinks redirect
+  - Unmatched paths: choose 404 or redirect to target
+  - More control over what gets redirected
+  - Useful when you want specific paths only
+
+
+SEO TOOL BLOCKING
+-----------------
+Blocked (receive 404):
+  - AhrefsBot
+  - MJ12bot (Majestic)
+  - SemrushBot
+  - DotBot (Moz)
+  - Screaming Frog
+  - And others...
+
+Allowed (receive 301 redirect):
+  - Googlebot
+  - Bingbot
+  - DuckDuckBot
+  - Yandexbot
+  - Social media bots (Facebook, Twitter, LinkedIn)
 
 
 TECHNICAL STACK
@@ -80,7 +124,7 @@ TECHNICAL STACK
 Frontend:
   - React 18 + TypeScript
   - Vite build tool
-  - Tailwind CSS
+  - Tailwind CSS (dark theme)
   - React Router
   - Axios for API calls
 
@@ -89,31 +133,41 @@ Backend:
   - TypeScript
   - SQLite database (better-sqlite3)
   - JWT authentication
-  - Multer for file uploads
 
-Server:
-  - OpenResty (nginx + Lua) for redirect handling
-  - Docker Compose deployment
-  - Cloudflare for SSL/DNS
+Redirect Server:
+  - OpenResty (nginx + Lua)
+  - Lua script for bot detection
+  - Dynamic config generation
+
+Deployment:
+  - Docker Compose
+  - Cloudflare for SSL/DNS proxy
 
 
 SERVER DETAILS
 --------------
 IP: 89.147.108.50
-Domain: skuldpath.com (admin panel)
+Admin Panel: https://skuldpath.com
+GitHub: https://github.com/ValkyrieScripts/seo-redirect-manager
+
 Ports:
-  - 80/443: Redirect server (OpenResty)
-  - 3000: Frontend (nginx)
+  - 80: Redirect server (OpenResty) - handles all redirect domains
+  - 3000: Frontend (nginx) - admin dashboard
   - 3001: Backend API
 
 
 DATABASE SCHEMA
 ---------------
 domains:
-  - id, domain_name, target_url, status, created_at, updated_at
+  - id, domain_name, target_url
+  - redirect_mode (full | path-specific)
+  - unmatched_behavior (404 | homepage)
+  - status (active | inactive)
+  - notes, priority
+  - created_at, updated_at
 
 backlinks:
-  - id, domain_id, linking_site, url_path, created_at
+  - id, domain_id, linking_url, url_path, created_at
 
 users:
   - id, username, password_hash, created_at
@@ -122,21 +176,28 @@ users:
 API ENDPOINTS
 -------------
 Auth:
-  POST /api/auth/login        - Login
-  GET  /api/auth/me           - Get current user
+  POST /api/auth/login           - Login
+  GET  /api/auth/me              - Get current user
   POST /api/auth/change-password - Change password
 
 Domains:
-  GET    /api/domains         - List all domains
-  GET    /api/domains/:id     - Get domain details
-  POST   /api/domains         - Create domain
-  PUT    /api/domains/:id     - Update domain
-  DELETE /api/domains/:id     - Delete domain
+  GET    /api/domains            - List all domains
+  GET    /api/domains/:id        - Get domain with backlinks
+  POST   /api/domains            - Create domain
+  PUT    /api/domains/:id        - Update domain
+  DELETE /api/domains/:id        - Delete domain
+  POST   /api/domains/:id/activate   - Activate domain
+  POST   /api/domains/:id/deactivate - Deactivate domain
 
 Backlinks:
-  GET    /api/backlinks/grouped/:domain_id - Get backlinks grouped by path
-  POST   /api/backlinks/import             - Import backlinks from CSV
-  DELETE /api/backlinks/domain/:domain_id  - Delete all backlinks for domain
+  GET    /api/backlinks/:domain_id         - Get all backlinks
+  GET    /api/backlinks/grouped/:domain_id - Get grouped by path
+  POST   /api/backlinks/import             - Import from CSV
+  DELETE /api/backlinks/:id                - Delete single
+  DELETE /api/backlinks/domain/:domain_id  - Delete all for domain
+
+Nginx:
+  POST /api/nginx/reload - Regenerate configs and reload
 
 
 DEPLOYMENT
@@ -150,6 +211,21 @@ To deploy updates:
   cd /opt/seo-redirect-manager
   git pull
   docker compose up -d --build
+
+
+CLOUDFLARE SETUP (IMPORTANT)
+----------------------------
+For each redirect domain:
+
+1. DNS Records:
+   Type: A | Name: @ | Content: 89.147.108.50 | Proxy: ON (orange)
+   Type: A | Name: www | Content: 89.147.108.50 | Proxy: ON (orange)
+
+2. SSL/TLS Settings:
+   Mode: Flexible (NOT Full!)
+
+   Why Flexible? Our server only serves HTTP on port 80.
+   Cloudflare handles HTTPS for visitors.
 
 
 LOGIN CREDENTIALS

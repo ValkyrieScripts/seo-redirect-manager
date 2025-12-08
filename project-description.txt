@@ -1,0 +1,161 @@
+================================================================================
+                        SEO REDIRECT MANAGER
+                        Project Description
+================================================================================
+
+OVERVIEW
+--------
+A tool for managing 301 redirects from expired/purchased domains to capture
+their SEO backlink value. When you acquire an expired domain that has existing
+backlinks pointing to it, this tool redirects all traffic to your target site,
+passing along the "link juice" for SEO benefits.
+
+
+HOW IT WORKS
+------------
+1. You purchase an expired domain that has valuable backlinks
+2. Add the domain to this system with a target URL
+3. Point the domain's DNS to this server (via Cloudflare)
+4. All traffic to the expired domain gets 301 redirected to your target
+5. Search engines follow the redirect and pass link authority to your site
+
+
+FEATURES
+--------
+• Add domains with a single target URL (all paths redirect to one destination)
+• Cloudflare DNS setup instructions shown after adding domain
+• Upload backlinks CSV/TXT to track which sites link to your domain
+• View backlinks grouped by URL path with counts
+• Expandable list showing all linking sites per path
+• Activate/deactivate redirects per domain
+• Simple dark theme dashboard
+
+
+TYPICAL WORKFLOW
+----------------
+1. Login to dashboard (admin / 1509)
+
+2. Click "Add Domain"
+   - Enter the expired domain name (e.g., old-expired-site.com)
+   - Enter your target URL (e.g., https://mysite.com)
+   - Click Add
+
+3. Configure Cloudflare DNS
+   - Go to Cloudflare for the domain
+   - Add A record: @ -> 89.147.108.50 (proxied)
+   - Add A record: www -> 89.147.108.50 (proxied)
+   - Set SSL mode to "Full"
+
+4. Upload backlinks (optional, for tracking)
+   - Get backlink data from Ahrefs, Moz, or similar tool
+   - Format as CSV: linking_site,url_path
+   - Example:
+     highauthority.com,/old-article
+     blogger.net,/best-guide
+     news-site.org,/
+   - Upload via the domain detail page
+
+5. Monitor
+   - View which paths have the most backlinks
+   - Expand paths to see all linking domains
+   - Track total backlink count per domain
+
+
+FILE FORMAT FOR BACKLINK IMPORT
+-------------------------------
+CSV or TXT file with two columns:
+  linking_site,url_path
+
+Examples:
+  example.com,/some-page
+  blog.site.org,/article-title
+  news.com,/
+
+The url_path is the path on YOUR expired domain that the external site links to.
+The linking_site is the domain that contains the backlink.
+
+
+TECHNICAL STACK
+---------------
+Frontend:
+  - React 18 + TypeScript
+  - Vite build tool
+  - Tailwind CSS
+  - React Router
+  - Axios for API calls
+
+Backend:
+  - Node.js + Express
+  - TypeScript
+  - SQLite database (better-sqlite3)
+  - JWT authentication
+  - Multer for file uploads
+
+Server:
+  - OpenResty (nginx + Lua) for redirect handling
+  - Docker Compose deployment
+  - Cloudflare for SSL/DNS
+
+
+SERVER DETAILS
+--------------
+IP: 89.147.108.50
+Domain: skuldpath.com (admin panel)
+Ports:
+  - 80/443: Redirect server (OpenResty)
+  - 3000: Frontend (nginx)
+  - 3001: Backend API
+
+
+DATABASE SCHEMA
+---------------
+domains:
+  - id, domain_name, target_url, status, created_at, updated_at
+
+backlinks:
+  - id, domain_id, linking_site, url_path, created_at
+
+users:
+  - id, username, password_hash, created_at
+
+
+API ENDPOINTS
+-------------
+Auth:
+  POST /api/auth/login        - Login
+  GET  /api/auth/me           - Get current user
+  POST /api/auth/change-password - Change password
+
+Domains:
+  GET    /api/domains         - List all domains
+  GET    /api/domains/:id     - Get domain details
+  POST   /api/domains         - Create domain
+  PUT    /api/domains/:id     - Update domain
+  DELETE /api/domains/:id     - Delete domain
+
+Backlinks:
+  GET    /api/backlinks/grouped/:domain_id - Get backlinks grouped by path
+  POST   /api/backlinks/import             - Import backlinks from CSV
+  DELETE /api/backlinks/domain/:domain_id  - Delete all backlinks for domain
+
+
+DEPLOYMENT
+----------
+The application runs via Docker Compose with three containers:
+  - seo-redirect-backend: Node.js API server
+  - seo-redirect-frontend: nginx serving React app
+  - seo-redirector: OpenResty handling actual redirects
+
+To deploy updates:
+  cd /opt/seo-redirect-manager
+  git pull
+  docker compose up -d --build
+
+
+LOGIN CREDENTIALS
+-----------------
+Default: admin / 1509
+Can be changed in Settings page
+
+
+================================================================================

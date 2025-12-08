@@ -2,7 +2,6 @@ import client from './client';
 import type { Domain, DomainFormData, DomainStatus } from '@/types';
 
 interface DomainListParams {
-  project_id?: number;
   status?: DomainStatus;
 }
 
@@ -29,10 +28,5 @@ export const domainsApi = {
 
   delete: async (id: number): Promise<void> => {
     await client.delete(`/domains/${id}`);
-  },
-
-  bulkCreate: async (domains: string[]): Promise<{ created: number; errors: string[] }> => {
-    const response = await client.post<{ created: number; errors: string[] }>('/domains/bulk', { domains });
-    return response.data;
   },
 };

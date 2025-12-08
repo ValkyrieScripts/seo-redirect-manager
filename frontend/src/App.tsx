@@ -4,19 +4,10 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Layout } from '@/components/layout';
-import {
-  LoginPage,
-  DashboardPage,
-  DomainsPage,
-  DomainDetailPage,
-  ProjectsPage,
-  ProjectDetailPage,
-  RedirectsPage,
-  BacklinksPage,
-  ExportPage,
-  SettingsPage,
-  InstructionsPage,
-} from '@/pages';
+import { LoginPage } from '@/pages/LoginPage';
+import { DashboardPage } from '@/pages/DashboardPage';
+import { DomainDetailPage } from '@/pages/DomainDetailPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,15 +36,8 @@ function App() {
               }
             >
               <Route path="/" element={<DashboardPage />} />
-              <Route path="/domains" element={<DomainsPage />} />
               <Route path="/domains/:id" element={<DomainDetailPage />} />
-              <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/projects/:id" element={<ProjectDetailPage />} />
-              <Route path="/redirects" element={<RedirectsPage />} />
-              <Route path="/backlinks" element={<BacklinksPage />} />
-              <Route path="/export" element={<ExportPage />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/instructions" element={<InstructionsPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
@@ -64,17 +48,18 @@ function App() {
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#333',
+              background: '#1e293b',
               color: '#fff',
+              border: '1px solid #334155',
             },
             success: {
               style: {
-                background: '#10b981',
+                background: '#059669',
               },
             },
             error: {
               style: {
-                background: '#ef4444',
+                background: '#dc2626',
               },
             },
           }}

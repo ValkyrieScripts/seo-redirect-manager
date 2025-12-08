@@ -1,383 +1,347 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Globe,
-  FolderKanban,
-  ArrowRightLeft,
-  Link2,
-  Plus,
-  ExternalLink,
-  TrendingUp,
-  Activity,
-  Clock,
-  ChevronRight,
-  Sparkles,
-} from 'lucide-react';
-import { exportApi } from '@/api/export';
-import type { DashboardStats } from '@/types';
-import { StatusBadge } from '@/components/ui/Badge';
-import { formatDate, truncate } from '@/lib/utils';
+import { Plus, Globe, ArrowRight, Check, Clock, X as XIcon } from 'lucide-react';
+import { domainsApi } from '@/api/domains';
+import type { Domain, DomainFormData } from '@/types';
 import toast from 'react-hot-toast';
 
-interface StatCardProps {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  link: string;
-  gradient: string;
-  iconBg: string;
-  delay: number;
-}
+export function DashboardPage() {
+  const [domains, setDomains] = useState<Domain[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showCloudflareModal, setShowCloudflareModal] = useState(false);
+  const [newDomain, setNewDomain] = useState<Domain | null>(null);
 
-function StatCard({ title, value, icon: Icon, link, gradient, iconBg, delay }: StatCardProps) {
-  return (
-    <Link to={link} className="group block">
-      <div
-        className="relative overflow-hidden rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in"
-        style={{ animationDelay: `${delay}s` }}
-      >
-        {/* Background gradient */}
-        <div className={`absolute inset-0 ${gradient} opacity-90`} />
+  useEffect(() => {
+    fetchDomains();
+  }, []);
 
-        {/* Subtle pattern overlay */}
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: `radial-gradient(circle at 2px 2px, white 1px, transparent 0)`,
-          backgroundSize: '24px 24px'
-        }} />
-
-        {/* Glow effect on hover */}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/5" />
-
-        {/* Content */}
-        <div className="relative z-10 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-white/70 mb-1">{title}</p>
-            <p className="text-4xl font-bold text-white tracking-tight">{value.toLocaleString()}</p>
-          </div>
-          <div className={`flex h-14 w-14 items-center justify-center rounded-xl ${iconBg} shadow-lg`}>
-            <Icon className="h-7 w-7 text-white" />
-          </div>
-        </div>
-
-        {/* Bottom link indicator */}
-        <div className="relative z-10 mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
-          <span className="text-sm text-white/60">View details</span>
-          <ChevronRight className="h-4 w-4 text-white/60 group-hover:translate-x-1 transition-transform" />
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-interface StatusCardProps {
-  label: string;
-  value: number;
-  color: 'emerald' | 'amber' | 'rose';
-}
-
-function StatusCard({ label, value, color }: StatusCardProps) {
-  const colors = {
-    emerald: {
-      bg: 'bg-emerald-500/10',
-      border: 'border-emerald-500/20',
-      text: 'text-emerald-400',
-      dot: 'bg-emerald-400'
-    },
-    amber: {
-      bg: 'bg-amber-500/10',
-      border: 'border-amber-500/20',
-      text: 'text-amber-400',
-      dot: 'bg-amber-400'
-    },
-    rose: {
-      bg: 'bg-rose-500/10',
-      border: 'border-rose-500/20',
-      text: 'text-rose-400',
-      dot: 'bg-rose-400'
+  const fetchDomains = async () => {
+    try {
+      const data = await domainsApi.list();
+      setDomains(data);
+    } catch (error) {
+      toast.error('Failed to load domains');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const c = colors[color];
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+            <Check className="h-3 w-3" /> Active
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+            <Clock className="h-3 w-3" /> Pending
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/30">
+            Inactive
+          </span>
+        );
+    }
+  };
 
   return (
-    <div className={`flex items-center justify-between rounded-xl ${c.bg} border ${c.border} p-4 transition-all hover:scale-[1.02]`}>
-      <div className="flex items-center gap-3">
-        <div className={`h-3 w-3 rounded-full ${c.dot} animate-pulse`} />
-        <span className={`text-sm font-medium ${c.text}`}>{label}</span>
+    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Domains</h1>
+          <p className="mt-1 text-slate-400">Manage your redirect domains</p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20"
+        >
+          <Plus className="h-5 w-5" />
+          Add Domain
+        </button>
       </div>
-      <span className={`text-2xl font-bold ${c.text}`}>{value}</span>
+
+      {/* Domain List */}
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : domains.length === 0 ? (
+        <div className="text-center py-16 bg-slate-800/50 rounded-xl border border-slate-700">
+          <Globe className="h-12 w-12 text-slate-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">No domains yet</h3>
+          <p className="text-slate-400 mb-6">Add your first domain to start redirecting traffic</p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="h-5 w-5" />
+            Add Domain
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {domains.map((domain) => (
+            <Link
+              key={domain.id}
+              to={`/domains/${domain.id}`}
+              className="block p-5 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700 hover:border-slate-600 transition-all group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-700/50 group-hover:bg-blue-600/20 transition-colors">
+                    <Globe className="h-6 w-6 text-slate-400 group-hover:text-blue-400 transition-colors" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors">
+                      {domain.domain_name}
+                    </h3>
+                    <p className="text-sm text-slate-400 flex items-center gap-1.5 mt-0.5">
+                      <ArrowRight className="h-3 w-3" />
+                      {domain.target_url || 'No target set'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-sm font-medium text-white">
+                      {domain.backlink_count || 0}
+                    </p>
+                    <p className="text-xs text-slate-500">backlinks</p>
+                  </div>
+                  {getStatusBadge(domain.status)}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Add Domain Modal */}
+      {showAddModal && (
+        <AddDomainModal
+          onClose={() => setShowAddModal(false)}
+          onSuccess={(domain) => {
+            setNewDomain(domain);
+            setShowAddModal(false);
+            setShowCloudflareModal(true);
+            fetchDomains();
+          }}
+        />
+      )}
+
+      {/* Cloudflare Instructions Modal */}
+      {showCloudflareModal && newDomain && (
+        <CloudflareModal
+          domain={newDomain}
+          onClose={() => {
+            setShowCloudflareModal(false);
+            setNewDomain(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-export function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+// Add Domain Modal Component
+function AddDomainModal({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void;
+  onSuccess: (domain: Domain) => void;
+}) {
+  const [formData, setFormData] = useState<DomainFormData>({
+    domain_name: '',
+    target_url: '',
+  });
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await exportApi.getStats();
-        setStats(data);
-      } catch (err) {
-        toast.error('Failed to load dashboard stats');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.domain_name || !formData.target_url) {
+      toast.error('Please fill in all fields');
+      return;
+    }
 
-    fetchStats();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="relative">
-          <div className="h-16 w-16 rounded-full border-4 border-primary-500/20" />
-          <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary-500 border-t-transparent animate-spin" />
-        </div>
-        <p className="text-slate-400 animate-pulse">Loading dashboard...</p>
-      </div>
-    );
-  }
-
-  if (!stats) {
-    return (
-      <div className="text-center py-12">
-        <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-slate-800 mb-4">
-          <Activity className="h-8 w-8 text-slate-500" />
-        </div>
-        <p className="text-slate-400">Failed to load dashboard data</p>
-      </div>
-    );
-  }
-
-  const statCards = [
-    {
-      title: 'Total Projects',
-      value: stats.total_projects,
-      icon: FolderKanban,
-      link: '/projects',
-      gradient: 'bg-gradient-to-br from-violet-600 to-purple-700',
-      iconBg: 'bg-white/20',
-    },
-    {
-      title: 'Total Domains',
-      value: stats.total_domains,
-      icon: Globe,
-      link: '/domains',
-      gradient: 'bg-gradient-to-br from-blue-600 to-cyan-600',
-      iconBg: 'bg-white/20',
-    },
-    {
-      title: 'Total Redirects',
-      value: stats.total_redirects,
-      icon: ArrowRightLeft,
-      link: '/redirects',
-      gradient: 'bg-gradient-to-br from-emerald-600 to-teal-600',
-      iconBg: 'bg-white/20',
-    },
-    {
-      title: 'Total Backlinks',
-      value: stats.total_backlinks,
-      icon: Link2,
-      link: '/backlinks',
-      gradient: 'bg-gradient-to-br from-orange-500 to-rose-600',
-      iconBg: 'bg-white/20',
-    },
-  ];
+    setLoading(true);
+    try {
+      const domain = await domainsApi.create(formData);
+      toast.success('Domain added successfully');
+      onSuccess(domain);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to add domain');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-fade-in">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-purple-600">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-          </div>
-          <p className="text-slate-400">
-            Welcome back! Here's an overview of your redirect management system.
-          </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-slate-800 rounded-xl border border-slate-700 shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-slate-700">
+          <h2 className="text-lg font-semibold text-white">Add Domain</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+          >
+            <XIcon className="h-5 w-5" />
+          </button>
         </div>
-        <div className="flex gap-3">
-          <Link to="/domains">
-            <button className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-white overflow-hidden transition-all duration-300 hover:scale-105">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary-600 to-purple-600" />
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r from-primary-500 to-purple-500" />
-              <Plus className="relative h-5 w-5" />
-              <span className="relative">Add Domain</span>
-            </button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((card, index) => (
-          <StatCard key={card.title} {...card} delay={index * 0.1} />
-        ))}
-      </div>
-
-      {/* Domain Status Section */}
-      <div className="glass-card rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '0.4s' }}>
-        <div className="flex items-center gap-3 mb-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500/20 to-purple-500/20 border border-primary-500/20">
-            <TrendingUp className="h-5 w-5 text-primary-400" />
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Domain Name
+            </label>
+            <input
+              type="text"
+              value={formData.domain_name}
+              onChange={(e) =>
+                setFormData({ ...formData, domain_name: e.target.value })
+              }
+              placeholder="expired-domain.com"
+              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Domain Status Overview</h2>
-            <p className="text-sm text-slate-400">Current status of all your domains</p>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Target URL
+            </label>
+            <input
+              type="url"
+              value={formData.target_url}
+              onChange={(e) =>
+                setFormData({ ...formData, target_url: e.target.value })
+              }
+              placeholder="https://mysite.com"
+              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              All traffic from this domain will redirect here (301)
+            </p>
           </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatusCard
-            label="Active"
-            value={stats.domains_by_status?.active || 0}
-            color="emerald"
-          />
-          <StatusCard
-            label="Pending"
-            value={stats.domains_by_status?.pending || 0}
-            color="amber"
-          />
-          <StatusCard
-            label="Inactive"
-            value={stats.domains_by_status?.inactive || 0}
-            color="rose"
-          />
-        </div>
+          <div className="flex gap-3 pt-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Adding...' : 'Add Domain'}
+            </button>
+          </div>
+        </form>
       </div>
+    </div>
+  );
+}
 
-      {/* Recent Activity Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Domains */}
-        <div className="glass-card rounded-2xl overflow-hidden animate-fade-in" style={{ animationDelay: '0.5s' }}>
-          <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/20 border border-blue-500/20">
-                <Globe className="h-5 w-5 text-blue-400" />
-              </div>
-              <div>
-                <h2 className="font-semibold text-white">Recent Domains</h2>
-                <p className="text-sm text-slate-400">Latest added domains</p>
-              </div>
-            </div>
-            <Link
-              to="/domains"
-              className="inline-flex items-center gap-1 text-sm text-primary-400 hover:text-primary-300 transition-colors"
-            >
-              View All
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <div className="p-4">
-            {stats.recent_domains?.length > 0 ? (
-              <div className="space-y-2">
-                {stats.recent_domains.slice(0, 5).map((domain, index) => (
-                  <Link
-                    key={domain.id}
-                    to={`/domains/${domain.id}`}
-                    className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 hover:border-slate-600/50 transition-all duration-200 group animate-fade-in"
-                    style={{ animationDelay: `${0.5 + index * 0.05}s` }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-700/50 group-hover:bg-blue-500/20 transition-colors">
-                        <Globe className="h-4 w-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-white truncate group-hover:text-blue-400 transition-colors">
-                          {domain.domain}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <Clock className="h-3 w-3" />
-                          {formatDate(domain.created_at)}
-                        </div>
-                      </div>
-                    </div>
-                    <StatusBadge status={domain.status} />
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="py-8 text-center">
-                <Globe className="h-10 w-10 text-slate-600 mx-auto mb-3" />
-                <p className="text-sm text-slate-500">No domains yet</p>
-                <Link
-                  to="/domains"
-                  className="inline-flex items-center gap-1 mt-3 text-sm text-primary-400 hover:text-primary-300 transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add your first domain
-                </Link>
-              </div>
-            )}
-          </div>
+// Cloudflare Instructions Modal
+function CloudflareModal({
+  domain,
+  onClose,
+}: {
+  domain: Domain;
+  onClose: () => void;
+}) {
+  const serverIP = '89.147.108.50';
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-lg bg-slate-800 rounded-xl border border-slate-700 shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-slate-700">
+          <h2 className="text-lg font-semibold text-white">Cloudflare DNS Setup</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+          >
+            <XIcon className="h-5 w-5" />
+          </button>
         </div>
+        <div className="p-5 space-y-5">
+          <p className="text-slate-300">
+            Add these DNS records in Cloudflare for{' '}
+            <span className="font-semibold text-white">{domain.domain_name}</span>:
+          </p>
 
-        {/* Recent Redirects */}
-        <div className="glass-card rounded-2xl overflow-hidden animate-fade-in" style={{ animationDelay: '0.6s' }}>
-          <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/20">
-                <ArrowRightLeft className="h-5 w-5 text-emerald-400" />
-              </div>
-              <div>
-                <h2 className="font-semibold text-white">Recent Redirects</h2>
-                <p className="text-sm text-slate-400">Latest redirect rules</p>
+          {/* DNS Records */}
+          <div className="space-y-3">
+            <div className="p-4 bg-slate-900 rounded-lg border border-slate-700">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1.5 font-mono text-sm">
+                  <p className="text-slate-400">
+                    Type: <span className="text-white">A</span>
+                  </p>
+                  <p className="text-slate-400">
+                    Name: <span className="text-white">@</span>
+                  </p>
+                  <p className="text-slate-400">
+                    Content: <span className="text-blue-400">{serverIP}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(serverIP)}
+                  className="px-3 py-1.5 bg-slate-700 text-white text-xs font-medium rounded-lg hover:bg-slate-600 transition-colors"
+                >
+                  Copy IP
+                </button>
               </div>
             </div>
-            <Link
-              to="/redirects"
-              className="inline-flex items-center gap-1 text-sm text-primary-400 hover:text-primary-300 transition-colors"
-            >
-              View All
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <div className="p-4">
-            {stats.recent_redirects?.length > 0 ? (
-              <div className="space-y-2">
-                {stats.recent_redirects.slice(0, 5).map((redirect, index) => (
-                  <div
-                    key={redirect.id}
-                    className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 hover:border-slate-600/50 transition-all duration-200 group animate-fade-in"
-                    style={{ animationDelay: `${0.6 + index * 0.05}s` }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-mono text-sm text-white truncate">
-                          {redirect.source_path}
-                        </p>
-                        <p className="text-xs text-slate-500 truncate mt-1 flex items-center gap-1">
-                          <ArrowRightLeft className="h-3 w-3 flex-shrink-0" />
-                          {truncate(redirect.target_url, 50)}
-                        </p>
-                      </div>
-                      <span className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-slate-700/50 text-xs font-medium text-slate-300 border border-slate-600/50">
-                        {redirect.redirect_type}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-8 text-center">
-                <ArrowRightLeft className="h-10 w-10 text-slate-600 mx-auto mb-3" />
-                <p className="text-sm text-slate-500">No redirects yet</p>
-                <Link
-                  to="/redirects"
-                  className="inline-flex items-center gap-1 mt-3 text-sm text-primary-400 hover:text-primary-300 transition-colors"
+
+            <div className="p-4 bg-slate-900 rounded-lg border border-slate-700">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1.5 font-mono text-sm">
+                  <p className="text-slate-400">
+                    Type: <span className="text-white">A</span>
+                  </p>
+                  <p className="text-slate-400">
+                    Name: <span className="text-white">www</span>
+                  </p>
+                  <p className="text-slate-400">
+                    Content: <span className="text-blue-400">{serverIP}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(serverIP)}
+                  className="px-3 py-1.5 bg-slate-700 text-white text-xs font-medium rounded-lg hover:bg-slate-600 transition-colors"
                 >
-                  <Plus className="h-4 w-4" />
-                  Create your first redirect
-                </Link>
+                  Copy IP
+                </button>
               </div>
-            )}
+            </div>
           </div>
+
+          <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <p className="text-sm text-amber-400">
+              <strong>Important:</strong> Enable the proxy (orange cloud) for both records.
+              Set SSL mode to "Full" in Cloudflare SSL/TLS settings.
+            </p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Got it
+          </button>
         </div>
       </div>
     </div>

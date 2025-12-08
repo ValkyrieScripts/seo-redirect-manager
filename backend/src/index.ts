@@ -6,8 +6,8 @@ import path from 'path';
 import { initDatabase } from './db/database';
 import { authRouter } from './routes/auth';
 import { domainsRouter } from './routes/domains';
-import { projectsRouter } from './routes/projects';
-import { redirectsRouter } from './routes/redirects';
+// import { projectsRouter } from './routes/projects'; // Deprecated
+// import { redirectsRouter } from './routes/redirects'; // Deprecated - using domain.target_url
 import { backlinksRouter } from './routes/backlinks';
 import { exportRouter } from './routes/export';
 import { nginxRouter } from './routes/nginx';
@@ -31,8 +31,8 @@ app.use('/api/auth', authRouter);
 
 // Protected routes
 app.use('/api/domains', authMiddleware, domainsRouter);
-app.use('/api/projects', authMiddleware, projectsRouter);
-app.use('/api/redirects', authMiddleware, redirectsRouter);
+// app.use('/api/projects', authMiddleware, projectsRouter); // Deprecated
+// app.use('/api/redirects', authMiddleware, redirectsRouter); // Deprecated
 app.use('/api/backlinks', authMiddleware, backlinksRouter);
 app.use('/api/export', authMiddleware, exportRouter);
 app.use('/api/nginx', authMiddleware, nginxRouter);

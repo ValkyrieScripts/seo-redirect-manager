@@ -1,92 +1,57 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Globe,
-  ArrowRightLeft,
-  Link2,
-  Plus,
-  Edit,
+  ArrowRight,
+  Upload,
+  ChevronDown,
+  ChevronRight,
   Trash2,
+  Check,
+  Clock,
+  Edit2,
+  X as XIcon,
+  Copy,
   ExternalLink,
 } from 'lucide-react';
 import { domainsApi } from '@/api/domains';
-import { redirectsApi } from '@/api/redirects';
 import { backlinksApi } from '@/api/backlinks';
-import type { Domain, Redirect, Backlink, BacklinkPath, RedirectFormData, RedirectType } from '@/types';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Checkbox } from '@/components/ui/Checkbox';
-import { Card, CardHeader, CardContent } from '@/components/ui/Card';
-import { Modal } from '@/components/ui/Modal';
-import { StatusBadge, Badge } from '@/components/ui/Badge';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-  TableEmpty,
-} from '@/components/ui/Table';
-import { LoadingState } from '@/components/ui/Spinner';
-import { truncate } from '@/lib/utils';
+import type { Domain, GroupedBacklink } from '@/types';
 import toast from 'react-hot-toast';
 
 export function DomainDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const domainId = parseInt(id || '0');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [domain, setDomain] = useState<Domain | null>(null);
-  const [redirects, setRedirects] = useState<Redirect[]>([]);
-  const [backlinks, setBacklinks] = useState<Backlink[]>([]);
-  const [backlinkPaths, setBacklinkPaths] = useState<BacklinkPath[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'redirects' | 'backlinks' | 'paths'>('redirects');
+  const [groupedBacklinks, setGroupedBacklinks] = useState<GroupedBacklink[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [newTargetUrl, setNewTargetUrl] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  // Modal states
-  const [isAddRedirectOpen, setIsAddRedirectOpen] = useState(false);
-  const [editingRedirect, setEditingRedirect] = useState<Redirect | null>(null);
-  const [deletingRedirect, setDeletingRedirect] = useState<Redirect | null>(null);
-  const [isGenerateRedirectsOpen, setIsGenerateRedirectsOpen] = useState(false);
-  const [isTestRedirectOpen, setIsTestRedirectOpen] = useState(false);
-
-  // Form states
-  const [redirectForm, setRedirectForm] = useState<RedirectFormData>({
-    domain_id: domainId,
-    source_path: '',
-    target_url: '',
-    redirect_type: '301',
-    is_regex: false,
-    priority: 0,
-    notes: '',
-  });
-  const [generateTargetUrl, setGenerateTargetUrl] = useState('');
-  const [testPath, setTestPath] = useState('');
-  const [testResult, setTestResult] = useState<{ matched: boolean; target_url: string | null; redirect_type: string | null } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const serverIP = '89.147.108.50';
 
   const fetchData = useCallback(async () => {
     if (!domainId) return;
     try {
-      const [domainData, redirectsData, backlinksData, pathsData] = await Promise.all([
+      const [domainData, backlinksData] = await Promise.all([
         domainsApi.get(domainId),
-        redirectsApi.list({ domain_id: domainId }),
-        backlinksApi.list({ domain_id: domainId }),
-        backlinksApi.getPaths(domainId),
+        backlinksApi.getGrouped(domainId),
       ]);
       setDomain(domainData);
-      setRedirects(redirectsData);
-      setBacklinks(backlinksData);
-      setBacklinkPaths(pathsData);
+      setGroupedBacklinks(backlinksData);
+      setNewTargetUrl(domainData.target_url || '');
     } catch (err) {
       toast.error('Failed to load domain details');
-      console.error(err);
-      navigate('/domains');
+      navigate('/');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, [domainId, navigate]);
 
@@ -94,608 +59,388 @@ export function DomainDetailPage() {
     fetchData();
   }, [fetchData]);
 
-  const resetRedirectForm = () => {
-    setRedirectForm({
-      domain_id: domainId,
-      source_path: '',
-      target_url: '',
-      redirect_type: '301',
-      is_regex: false,
-      priority: 0,
-      notes: '',
+  const togglePath = (path: string) => {
+    setExpandedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
     });
   };
 
-  const handleAddRedirect = async () => {
-    setIsSubmitting(true);
+  const handleUpdateTarget = async () => {
+    if (!domain) return;
     try {
-      await redirectsApi.create(redirectForm);
-      toast.success('Redirect added successfully');
-      setIsAddRedirectOpen(false);
-      resetRedirectForm();
+      await domainsApi.update(domain.id, { target_url: newTargetUrl });
+      toast.success('Target URL updated');
+      setIsEditingTarget(false);
       fetchData();
     } catch (err) {
-      toast.error('Failed to add redirect');
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
+      toast.error('Failed to update target URL');
     }
   };
 
-  const handleEditRedirect = async () => {
-    if (!editingRedirect) return;
-    setIsSubmitting(true);
+  const handleStatusToggle = async () => {
+    if (!domain) return;
+    const newStatus = domain.status === 'active' ? 'inactive' : 'active';
     try {
-      await redirectsApi.update(editingRedirect.id, redirectForm);
-      toast.success('Redirect updated successfully');
-      setEditingRedirect(null);
-      resetRedirectForm();
+      await domainsApi.update(domain.id, { status: newStatus });
+      toast.success(`Domain ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
       fetchData();
     } catch (err) {
-      toast.error('Failed to update redirect');
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
+      toast.error('Failed to update status');
     }
   };
 
-  const handleDeleteRedirect = async () => {
-    if (!deletingRedirect) return;
-    setIsSubmitting(true);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
     try {
-      await redirectsApi.delete(deletingRedirect.id);
-      toast.success('Redirect deleted successfully');
-      setDeletingRedirect(null);
+      const result = await backlinksApi.import(domainId, file);
+      toast.success(`Imported ${result.imported} backlinks (${result.skipped} skipped)`);
       fetchData();
     } catch (err) {
-      toast.error('Failed to delete redirect');
-      console.error(err);
+      toast.error('Failed to import backlinks');
     } finally {
-      setIsSubmitting(false);
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
-  const handleGenerateRedirects = async () => {
-    if (!generateTargetUrl) {
-      toast.error('Please enter a target URL');
-      return;
-    }
-    setIsSubmitting(true);
+  const handleDeleteDomain = async () => {
+    if (!domain) return;
     try {
-      const result = await backlinksApi.generateRedirects(domainId, generateTargetUrl);
-      toast.success(`Generated ${result.created} redirects`);
-      setIsGenerateRedirectsOpen(false);
-      setGenerateTargetUrl('');
+      await domainsApi.delete(domain.id);
+      toast.success('Domain deleted');
+      navigate('/');
+    } catch (err) {
+      toast.error('Failed to delete domain');
+    }
+  };
+
+  const handleClearBacklinks = async () => {
+    try {
+      await backlinksApi.deleteAll(domainId);
+      toast.success('All backlinks cleared');
       fetchData();
     } catch (err) {
-      toast.error('Failed to generate redirects');
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
+      toast.error('Failed to clear backlinks');
     }
   };
 
-  const handleTestRedirect = async () => {
-    if (!testPath) {
-      toast.error('Please enter a path to test');
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      const result = await redirectsApi.test(domainId, testPath);
-      setTestResult(result);
-    } catch (err) {
-      toast.error('Failed to test redirect');
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+            <Check className="h-3 w-3" /> Active
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+            <Clock className="h-3 w-3" /> Pending
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/30">
+            Inactive
+          </span>
+        );
     }
   };
 
-  const openEditRedirect = (redirect: Redirect) => {
-    setRedirectForm({
-      domain_id: domainId,
-      source_path: redirect.source_path,
-      target_url: redirect.target_url,
-      redirect_type: redirect.redirect_type,
-      is_regex: redirect.is_regex,
-      priority: redirect.priority,
-      notes: redirect.notes || '',
-    });
-    setEditingRedirect(redirect);
-  };
-
-  const redirectTypeOptions = [
-    { value: '301', label: '301 - Permanent' },
-    { value: '302', label: '302 - Temporary' },
-    { value: '307', label: '307 - Temporary (Preserve Method)' },
-    { value: '308', label: '308 - Permanent (Preserve Method)' },
-  ];
-
-  if (isLoading) {
-    return <LoadingState message="Loading domain details..." />;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   if (!domain) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Domain not found</p>
-        <Link to="/domains">
-          <Button className="mt-4">Back to Domains</Button>
+      <div className="p-6 lg:p-8 text-center">
+        <p className="text-slate-400">Domain not found</p>
+        <Link to="/" className="text-blue-400 hover:underline mt-2 inline-block">
+          Back to domains
         </Link>
       </div>
     );
   }
 
-  const tabs = [
-    { id: 'redirects', label: 'Redirects', count: redirects.length },
-    { id: 'backlinks', label: 'Backlinks', count: backlinks.length },
-    { id: 'paths', label: 'Backlink Paths', count: backlinkPaths.length },
-  ] as const;
-
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
+    <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4">
-        <Link to="/domains">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+        <Link
+          to="/"
+          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+        >
+          <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <Globe className="h-6 w-6 text-primary-600" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{domain.domain}</h1>
-            <StatusBadge status={domain.status} />
+            <Globe className="h-6 w-6 text-blue-400" />
+            <h1 className="text-2xl font-bold text-white">{domain.domain_name}</h1>
+            {getStatusBadge(domain.status)}
           </div>
-          {domain.target_url && (
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Default target: {domain.target_url}
-            </p>
+        </div>
+        <button
+          onClick={handleStatusToggle}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            domain.status === 'active'
+              ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+              : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+          }`}
+        >
+          {domain.status === 'active' ? 'Deactivate' : 'Activate'}
+        </button>
+      </div>
+
+      {/* Target URL Section */}
+      <div className="p-5 bg-slate-800/50 rounded-xl border border-slate-700">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-medium text-slate-400">Target URL</h2>
+          {!isEditingTarget && (
+            <button
+              onClick={() => setIsEditingTarget(true)}
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <Edit2 className="h-4 w-4" />
+            </button>
           )}
         </div>
+        {isEditingTarget ? (
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={newTargetUrl}
+              onChange={(e) => setNewTargetUrl(e.target.value)}
+              className="flex-1 px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="https://mysite.com"
+            />
+            <button
+              onClick={handleUpdateTarget}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => {
+                setIsEditingTarget(false);
+                setNewTargetUrl(domain.target_url || '');
+              }}
+              className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <ArrowRight className="h-4 w-4 text-slate-500" />
+            <a
+              href={domain.target_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline flex items-center gap-1"
+            >
+              {domain.target_url || 'No target set'}
+              {domain.target_url && <ExternalLink className="h-3 w-3" />}
+            </a>
+          </div>
+        )}
+        <p className="mt-2 text-xs text-slate-500">
+          All traffic from this domain will 301 redirect here
+        </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900">
-              <ArrowRightLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+      {/* Cloudflare DNS Section */}
+      <div className="p-5 bg-slate-800/50 rounded-xl border border-slate-700">
+        <h2 className="text-lg font-semibold text-white mb-4">Cloudflare DNS Setup</h2>
+        <p className="text-slate-400 text-sm mb-4">
+          Add these DNS records in Cloudflare:
+        </p>
+        <div className="space-y-3">
+          <div className="p-4 bg-slate-900 rounded-lg border border-slate-700 flex items-center justify-between">
+            <div className="font-mono text-sm space-y-1">
+              <p className="text-slate-400">Type: <span className="text-white">A</span> | Name: <span className="text-white">@</span> | Content: <span className="text-blue-400">{serverIP}</span></p>
             </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Redirects</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">{redirects.length}</p>
+            <button
+              onClick={() => copyToClipboard(serverIP)}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <Copy className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="p-4 bg-slate-900 rounded-lg border border-slate-700 flex items-center justify-between">
+            <div className="font-mono text-sm space-y-1">
+              <p className="text-slate-400">Type: <span className="text-white">A</span> | Name: <span className="text-white">www</span> | Content: <span className="text-blue-400">{serverIP}</span></p>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900">
-              <Link2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Backlinks</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">{backlinks.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900">
-              <ExternalLink className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Unique Paths</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">{backlinkPaths.length}</p>
-            </div>
-          </CardContent>
-        </Card>
+            <button
+              onClick={() => copyToClipboard(serverIP)}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <Copy className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <p className="mt-4 text-xs text-amber-400">
+          Enable the proxy (orange cloud) and set SSL mode to "Full"
+        </p>
       </div>
 
-      {/* Tabs */}
-      <Card>
-        <CardHeader className="border-b border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-4">
-              {tabs.map((tab) => (
+      {/* Backlinks Section */}
+      <div className="p-5 bg-slate-800/50 rounded-xl border border-slate-700">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">
+            Backlinks
+            <span className="ml-2 text-sm font-normal text-slate-400">
+              ({domain.backlink_count || 0} total)
+            </span>
+          </h2>
+          <div className="flex gap-2">
+            {groupedBacklinks.length > 0 && (
+              <button
+                onClick={handleClearBacklinks}
+                className="px-3 py-1.5 text-sm text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+              >
+                Clear All
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.txt"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              <Upload className="h-4 w-4" />
+              {uploading ? 'Uploading...' : 'Upload CSV/TXT'}
+            </button>
+          </div>
+        </div>
+
+        <p className="text-slate-400 text-sm mb-4">
+          Format: <code className="bg-slate-900 px-2 py-0.5 rounded text-xs">linking_site,url_path</code> (e.g., <code className="bg-slate-900 px-2 py-0.5 rounded text-xs">example.com,/old-page</code>)
+        </p>
+
+        {groupedBacklinks.length === 0 ? (
+          <div className="text-center py-12 text-slate-500">
+            <Upload className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <p>No backlinks uploaded yet</p>
+            <p className="text-sm mt-1">Upload a CSV or TXT file to see backlinks</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {groupedBacklinks.map((group) => (
+              <div key={group.url_path} className="border border-slate-700 rounded-lg overflow-hidden">
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`pb-2 text-sm font-medium transition-colors ${
-                    activeTab === tab.id
-                      ? 'border-b-2 border-primary-600 text-primary-600'
-                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                  }`}
+                  onClick={() => togglePath(group.url_path)}
+                  className="w-full flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 transition-colors text-left"
                 >
-                  {tab.label} ({tab.count})
+                  <div className="flex items-center gap-3">
+                    {expandedPaths.has(group.url_path) ? (
+                      <ChevronDown className="h-4 w-4 text-slate-400" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-slate-400" />
+                    )}
+                    <span className="font-mono text-white">{group.url_path}</span>
+                  </div>
+                  <span className="text-sm text-slate-400">
+                    {group.count} backlink{group.count !== 1 ? 's' : ''}
+                  </span>
                 </button>
-              ))}
-            </div>
-            {activeTab === 'redirects' && (
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsTestRedirectOpen(true)}>
-                  Test Redirect
-                </Button>
-                <Button size="sm" onClick={() => setIsAddRedirectOpen(true)}>
-                  <Plus className="mr-1 h-4 w-4" />
-                  Add Redirect
-                </Button>
-              </div>
-            )}
-            {activeTab === 'paths' && backlinkPaths.length > 0 && (
-              <Button size="sm" onClick={() => setIsGenerateRedirectsOpen(true)}>
-                <Plus className="mr-1 h-4 w-4" />
-                Generate Redirects
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {activeTab === 'redirects' && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Source Path</TableHead>
-                  <TableHead>Target URL</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Regex</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {redirects.length === 0 ? (
-                  <TableEmpty colSpan={6} message="No redirects configured" />
-                ) : (
-                  redirects.map((redirect) => (
-                    <TableRow key={redirect.id}>
-                      <TableCell className="font-mono text-sm">{redirect.source_path}</TableCell>
-                      <TableCell className="max-w-xs truncate">{truncate(redirect.target_url, 50)}</TableCell>
-                      <TableCell>
-                        <Badge>{redirect.redirect_type}</Badge>
-                      </TableCell>
-                      <TableCell>{redirect.is_regex ? 'Yes' : 'No'}</TableCell>
-                      <TableCell>{redirect.priority}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditRedirect(redirect)}
-                            title="Edit redirect"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeletingRedirect(redirect)}
-                            title="Delete redirect"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                {expandedPaths.has(group.url_path) && (
+                  <div className="border-t border-slate-700 bg-slate-900/50 p-4">
+                    <div className="space-y-2">
+                      {group.linking_sites.map((site, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <span className="text-slate-500">•</span>
+                          <span className="text-slate-300">{site}</span>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </TableBody>
-            </Table>
-          )}
-
-          {activeTab === 'backlinks' && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Referring Page</TableHead>
-                  <TableHead>Target URL</TableHead>
-                  <TableHead>Anchor</TableHead>
-                  <TableHead>DR</TableHead>
-                  <TableHead>UR</TableHead>
-                  <TableHead>Traffic</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {backlinks.length === 0 ? (
-                  <TableEmpty colSpan={6} message="No backlinks imported" />
-                ) : (
-                  backlinks.map((backlink) => (
-                    <TableRow key={backlink.id}>
-                      <TableCell className="max-w-xs truncate">
-                        <a
-                          href={backlink.referring_page}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:underline"
-                        >
-                          {truncate(backlink.referring_page, 50)}
-                        </a>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">{truncate(backlink.target_url, 40)}</TableCell>
-                      <TableCell className="max-w-xs truncate">{backlink.anchor_text || '-'}</TableCell>
-                      <TableCell>{backlink.domain_rating ?? '-'}</TableCell>
-                      <TableCell>{backlink.url_rating ?? '-'}</TableCell>
-                      <TableCell>{backlink.traffic ?? '-'}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-
-          {activeTab === 'paths' && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Path</TableHead>
-                  <TableHead>Backlinks</TableHead>
-                  <TableHead>Avg DR</TableHead>
-                  <TableHead>Avg UR</TableHead>
-                  <TableHead>Total Traffic</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {backlinkPaths.length === 0 ? (
-                  <TableEmpty colSpan={5} message="No backlink paths found" />
-                ) : (
-                  backlinkPaths.map((path) => (
-                    <TableRow key={path.path}>
-                      <TableCell className="font-mono text-sm">{path.path}</TableCell>
-                      <TableCell>{path.count}</TableCell>
-                      <TableCell>{path.avg_dr?.toFixed(1) ?? '-'}</TableCell>
-                      <TableCell>{path.avg_ur?.toFixed(1) ?? '-'}</TableCell>
-                      <TableCell>{path.total_traffic ?? '-'}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Add Redirect Modal */}
-      <Modal
-        isOpen={isAddRedirectOpen}
-        onClose={() => {
-          setIsAddRedirectOpen(false);
-          resetRedirectForm();
-        }}
-        title="Add Redirect"
-      >
-        <div className="space-y-4">
-          <Input
-            id="source_path"
-            label="Source Path"
-            placeholder="/old-page"
-            value={redirectForm.source_path}
-            onChange={(e) => setRedirectForm({ ...redirectForm, source_path: e.target.value })}
-            required
-          />
-          <Input
-            id="target_url"
-            label="Target URL"
-            placeholder="https://example.com/new-page"
-            value={redirectForm.target_url}
-            onChange={(e) => setRedirectForm({ ...redirectForm, target_url: e.target.value })}
-            required
-          />
-          <Select
-            id="redirect_type"
-            label="Redirect Type"
-            options={redirectTypeOptions}
-            value={redirectForm.redirect_type}
-            onChange={(e) => setRedirectForm({ ...redirectForm, redirect_type: e.target.value as RedirectType })}
-          />
-          <div className="flex items-center gap-4">
-            <Checkbox
-              id="is_regex"
-              label="Use Regex"
-              checked={redirectForm.is_regex}
-              onChange={(e) => setRedirectForm({ ...redirectForm, is_regex: e.target.checked })}
-            />
-            <Input
-              id="priority"
-              label="Priority"
-              type="number"
-              value={redirectForm.priority}
-              onChange={(e) => setRedirectForm({ ...redirectForm, priority: parseInt(e.target.value) || 0 })}
-              className="w-24"
-            />
+              </div>
+            ))}
           </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsAddRedirectOpen(false);
-                resetRedirectForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleAddRedirect} isLoading={isSubmitting}>
-              Add Redirect
-            </Button>
+        )}
+      </div>
+
+      {/* Delete Domain */}
+      <div className="p-5 bg-red-500/10 rounded-xl border border-red-500/30">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-white font-medium">Delete Domain</h3>
+            <p className="text-sm text-slate-400 mt-1">
+              Permanently delete this domain and all its backlinks
+            </p>
           </div>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
-      </Modal>
-
-      {/* Edit Redirect Modal */}
-      <Modal
-        isOpen={!!editingRedirect}
-        onClose={() => {
-          setEditingRedirect(null);
-          resetRedirectForm();
-        }}
-        title="Edit Redirect"
-      >
-        <div className="space-y-4">
-          <Input
-            id="edit-source_path"
-            label="Source Path"
-            placeholder="/old-page"
-            value={redirectForm.source_path}
-            onChange={(e) => setRedirectForm({ ...redirectForm, source_path: e.target.value })}
-            required
-          />
-          <Input
-            id="edit-target_url"
-            label="Target URL"
-            placeholder="https://example.com/new-page"
-            value={redirectForm.target_url}
-            onChange={(e) => setRedirectForm({ ...redirectForm, target_url: e.target.value })}
-            required
-          />
-          <Select
-            id="edit-redirect_type"
-            label="Redirect Type"
-            options={redirectTypeOptions}
-            value={redirectForm.redirect_type}
-            onChange={(e) => setRedirectForm({ ...redirectForm, redirect_type: e.target.value as RedirectType })}
-          />
-          <div className="flex items-center gap-4">
-            <Checkbox
-              id="edit-is_regex"
-              label="Use Regex"
-              checked={redirectForm.is_regex}
-              onChange={(e) => setRedirectForm({ ...redirectForm, is_regex: e.target.checked })}
-            />
-            <Input
-              id="edit-priority"
-              label="Priority"
-              type="number"
-              value={redirectForm.priority}
-              onChange={(e) => setRedirectForm({ ...redirectForm, priority: parseInt(e.target.value) || 0 })}
-              className="w-24"
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditingRedirect(null);
-                resetRedirectForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleEditRedirect} isLoading={isSubmitting}>
-              Save Changes
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      </div>
 
       {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={!!deletingRedirect}
-        onClose={() => setDeletingRedirect(null)}
-        title="Delete Redirect"
-      >
-        <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Are you sure you want to delete the redirect from <strong>{deletingRedirect?.source_path}</strong>?
-            This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => setDeletingRedirect(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteRedirect} isLoading={isSubmitting}>
-              Delete Redirect
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Generate Redirects Modal */}
-      <Modal
-        isOpen={isGenerateRedirectsOpen}
-        onClose={() => {
-          setIsGenerateRedirectsOpen(false);
-          setGenerateTargetUrl('');
-        }}
-        title="Generate Redirects from Backlinks"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            This will create 301 redirects for all unique backlink paths to the target URL you specify.
-          </p>
-          <Input
-            id="generate-target"
-            label="Target URL"
-            placeholder="https://example.com/new-page"
-            value={generateTargetUrl}
-            onChange={(e) => setGenerateTargetUrl(e.target.value)}
-            required
-          />
-          <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              <strong>{backlinkPaths.length}</strong> unique paths will be redirected
-            </p>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsGenerateRedirectsOpen(false);
-                setGenerateTargetUrl('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleGenerateRedirects} isLoading={isSubmitting}>
-              Generate Redirects
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Test Redirect Modal */}
-      <Modal
-        isOpen={isTestRedirectOpen}
-        onClose={() => {
-          setIsTestRedirectOpen(false);
-          setTestPath('');
-          setTestResult(null);
-        }}
-        title="Test Redirect"
-      >
-        <div className="space-y-4">
-          <Input
-            id="test-path"
-            label="Path to Test"
-            placeholder="/example-path"
-            value={testPath}
-            onChange={(e) => {
-              setTestPath(e.target.value);
-              setTestResult(null);
-            }}
-          />
-          <Button onClick={handleTestRedirect} isLoading={isSubmitting} className="w-full">
-            Test
-          </Button>
-          {testResult && (
-            <div className={`rounded-lg p-4 ${testResult.matched ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
-              {testResult.matched ? (
-                <div className="space-y-2">
-                  <p className="font-medium text-green-700 dark:text-green-400">Match found!</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    <strong>Target:</strong> {testResult.target_url}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    <strong>Type:</strong> {testResult.redirect_type}
-                  </p>
-                </div>
-              ) : (
-                <p className="font-medium text-red-700 dark:text-red-400">No matching redirect found</p>
-              )}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-slate-800 rounded-xl border border-slate-700 shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-slate-700">
+              <h2 className="text-lg font-semibold text-white">Delete Domain</h2>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <XIcon className="h-5 w-5" />
+              </button>
             </div>
-          )}
+            <div className="p-5 space-y-4">
+              <p className="text-slate-300">
+                Are you sure you want to delete <strong className="text-white">{domain.domain_name}</strong>?
+                This will also delete all associated backlinks.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteDomain}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </Modal>
+      )}
     </div>
   );
 }

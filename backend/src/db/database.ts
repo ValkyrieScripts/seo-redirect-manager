@@ -27,7 +27,7 @@ export function initDatabase(): void {
 
   // Create tables
   db.exec(`
-    -- Projects table
+    -- Projects table (deprecated - kept for migration)
     CREATE TABLE IF NOT EXISTS projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -37,17 +37,14 @@ export function initDatabase(): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Domains table
+    -- Domains table (simplified: one target URL per domain)
     CREATE TABLE IF NOT EXISTS domains (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       domain_name TEXT NOT NULL UNIQUE,
-      project_id INTEGER,
-      redirect_type TEXT DEFAULT 'partial' CHECK(redirect_type IN ('full', 'partial')),
+      target_url TEXT NOT NULL DEFAULT '',
       status TEXT DEFAULT 'pending' CHECK(status IN ('active', 'inactive', 'pending')),
-      notes TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
     -- Redirects table
@@ -66,19 +63,12 @@ export function initDatabase(): void {
       UNIQUE(domain_id, source_path)
     );
 
-    -- Backlinks table
+    -- Backlinks table (simplified: linking_site + url_path)
     CREATE TABLE IF NOT EXISTS backlinks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       domain_id INTEGER NOT NULL,
-      source_url TEXT NOT NULL,
-      source_path TEXT NOT NULL,
-      referring_domain TEXT NOT NULL,
-      anchor_text TEXT,
-      domain_rating INTEGER,
-      url_rating INTEGER,
-      traffic INTEGER,
-      first_seen TEXT,
-      last_seen TEXT,
+      linking_site TEXT NOT NULL,
+      url_path TEXT NOT NULL DEFAULT '/',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
     );
@@ -92,11 +82,28 @@ export function initDatabase(): void {
     );
 
     -- Create indexes
-    CREATE INDEX IF NOT EXISTS idx_domains_project ON domains(project_id);
     CREATE INDEX IF NOT EXISTS idx_redirects_domain ON redirects(domain_id);
     CREATE INDEX IF NOT EXISTS idx_backlinks_domain ON backlinks(domain_id);
-    CREATE INDEX IF NOT EXISTS idx_backlinks_source_path ON backlinks(source_path);
+    CREATE INDEX IF NOT EXISTS idx_backlinks_url_path ON backlinks(url_path);
   `);
+
+  // Migration: Add target_url column to domains if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE domains ADD COLUMN target_url TEXT NOT NULL DEFAULT ''`);
+    console.log('Migration: Added target_url column to domains');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add linking_site column to backlinks if it doesn't exist (for old schema)
+  try {
+    db.exec(`ALTER TABLE backlinks ADD COLUMN linking_site TEXT NOT NULL DEFAULT ''`);
+    // Migrate data: copy referring_domain to linking_site if it exists
+    db.exec(`UPDATE backlinks SET linking_site = referring_domain WHERE linking_site = '' AND referring_domain IS NOT NULL`);
+    console.log('Migration: Added linking_site column to backlinks');
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
   // Create default admin user if none exists
   const adminExists = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };

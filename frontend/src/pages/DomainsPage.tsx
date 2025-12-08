@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Trash2, Edit, Eye, Upload, Globe, X } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, Eye, Upload, Globe, X } from 'lucide-react';
 import { domainsApi } from '@/api/domains';
 import { projectsApi } from '@/api/projects';
 import type { Domain, Project, DomainStatus, DomainFormData } from '@/types';

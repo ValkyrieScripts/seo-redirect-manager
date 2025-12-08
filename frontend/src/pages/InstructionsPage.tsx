@@ -166,10 +166,10 @@ export function InstructionsPage() {
             Ahrefs provides detailed backlink data. Here's how to export and import:
           </p>
           <ol className="space-y-2 text-slate-300">
-            <li><strong className="text-white">1.</strong> Go to Ahrefs Site Explorer -> Enter your expired domain</li>
-            <li><strong className="text-white">2.</strong> Navigate to Backlinks -> All backlinks</li>
-            <li><strong className="text-white">3.</strong> Click "Export" -> Choose CSV format</li>
-            <li><strong className="text-white">4.</strong> In this tool, go to Backlinks -> Select your domain -> Upload CSV</li>
+            <li><strong className="text-white">1.</strong> Go to Ahrefs Site Explorer → Enter your expired domain</li>
+            <li><strong className="text-white">2.</strong> Navigate to Backlinks → All backlinks</li>
+            <li><strong className="text-white">3.</strong> Click "Export" → Choose CSV format</li>
+            <li><strong className="text-white">4.</strong> In this tool, go to Backlinks → Select your domain → Upload CSV</li>
             <li><strong className="text-white">5.</strong> Review the imported backlinks and their Domain Rating (DR)</li>
             <li><strong className="text-white">6.</strong> Click "Generate Redirects" to auto-create redirect rules for all backlinked URLs</li>
           </ol>

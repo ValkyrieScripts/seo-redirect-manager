@@ -2,8 +2,6 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { ArrowRightLeft, LogIn, Lock, User, Sparkles, Globe, Link2, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import toast from 'react-hot-toast';
 
 export function LoginPage() {

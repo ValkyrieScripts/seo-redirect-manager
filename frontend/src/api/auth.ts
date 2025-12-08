@@ -1,15 +1,15 @@
 import client from './client';
-import type { AuthResponse, User } from '@/types';
+import type { User } from '../types';
 
 export const authApi = {
-  login: async (username: string, password: string): Promise<AuthResponse> => {
-    const response = await client.post<AuthResponse>('/auth/login', { username, password });
+  login: async (username: string, password: string): Promise<{ token: string; user: User }> => {
+    const response = await client.post('/auth/login', { username, password });
     return response.data;
   },
 
-  verify: async (): Promise<User> => {
-    const response = await client.get<{ user: User }>('/auth/verify');
-    return response.data.user;
+  me: async (): Promise<User> => {
+    const response = await client.get('/auth/me');
+    return response.data;
   },
 
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {

@@ -1,206 +1,154 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import {
-  ArrowLeft,
-  Globe,
-  ArrowRight,
-  Upload,
-  ChevronDown,
-  ChevronRight,
-  Trash2,
-  Check,
-  Clock,
-  Edit2,
-  X as XIcon,
-  Copy,
-  ExternalLink,
-} from 'lucide-react';
-import { domainsApi } from '@/api/domains';
-import { backlinksApi } from '@/api/backlinks';
-import type { Domain, GroupedBacklink } from '@/types';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { domainsApi } from '../api/domains';
+import { backlinksApi } from '../api/backlinks';
+import type { Domain, GroupedBacklink } from '../types';
 import toast from 'react-hot-toast';
 
 export function DomainDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
   const domainId = parseInt(id || '0');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [domain, setDomain] = useState<Domain | null>(null);
-  const [groupedBacklinks, setGroupedBacklinks] = useState<GroupedBacklink[]>([]);
+  const [backlinks, setBacklinks] = useState<GroupedBacklink[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
-  const [isEditingTarget, setIsEditingTarget] = useState(false);
-  const [newTargetUrl, setNewTargetUrl] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetUrl, setTargetUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
-  const serverIP = '89.147.108.50';
+  const serverIp = '89.147.108.50';
 
-  const fetchData = useCallback(async () => {
+  useEffect(() => {
     if (!domainId) return;
+    loadData();
+  }, [domainId]);
+
+  const loadData = async () => {
     try {
-      const [domainData, backlinksData] = await Promise.all([
+      const [d, b] = await Promise.all([
         domainsApi.get(domainId),
         backlinksApi.getGrouped(domainId),
       ]);
-      setDomain(domainData);
-      setGroupedBacklinks(backlinksData);
-      setNewTargetUrl(domainData.target_url || '');
-    } catch (err) {
-      toast.error('Failed to load domain details');
+      setDomain(d);
+      setBacklinks(b);
+      setTargetUrl(d.target_url || '');
+    } catch {
+      toast.error('Failed to load domain');
       navigate('/');
     } finally {
       setLoading(false);
     }
-  }, [domainId, navigate]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const togglePath = (path: string) => {
-    setExpandedPaths((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
   };
 
-  const handleUpdateTarget = async () => {
-    if (!domain) return;
+  const saveTarget = async () => {
     try {
-      await domainsApi.update(domain.id, { target_url: newTargetUrl });
-      toast.success('Target URL updated');
-      setIsEditingTarget(false);
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to update target URL');
+      await domainsApi.update(domainId, { target_url: targetUrl });
+      toast.success('Target updated');
+      setEditingTarget(false);
+      loadData();
+    } catch {
+      toast.error('Failed to update');
     }
   };
 
-  const handleStatusToggle = async () => {
+  const toggleStatus = async () => {
     if (!domain) return;
     const newStatus = domain.status === 'active' ? 'inactive' : 'active';
     try {
-      await domainsApi.update(domain.id, { status: newStatus });
-      toast.success(`Domain ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
-      fetchData();
-    } catch (err) {
+      await domainsApi.update(domainId, { status: newStatus });
+      toast.success(newStatus === 'active' ? 'Activated' : 'Deactivated');
+      loadData();
+    } catch {
       toast.error('Failed to update status');
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
     try {
       const result = await backlinksApi.import(domainId, file);
-      toast.success(`Imported ${result.imported} backlinks (${result.skipped} skipped)`);
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to import backlinks');
+      toast.success(`Imported ${result.imported} backlinks`);
+      loadData();
+    } catch {
+      toast.error('Failed to import');
     } finally {
       setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
-  const handleDeleteDomain = async () => {
-    if (!domain) return;
-    try {
-      await domainsApi.delete(domain.id);
-      toast.success('Domain deleted');
-      navigate('/');
-    } catch (err) {
-      toast.error('Failed to delete domain');
-    }
-  };
-
-  const handleClearBacklinks = async () => {
+  const clearBacklinks = async () => {
     try {
       await backlinksApi.deleteAll(domainId);
-      toast.success('All backlinks cleared');
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to clear backlinks');
+      toast.success('Backlinks cleared');
+      loadData();
+    } catch {
+      toast.error('Failed to clear');
     }
   };
 
-  const copyToClipboard = (text: string) => {
+  const deleteDomain = async () => {
+    try {
+      await domainsApi.delete(domainId);
+      toast.success('Domain deleted');
+      navigate('/');
+    } catch {
+      toast.error('Failed to delete');
+    }
+  };
+
+  const copy = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard');
+    toast.success('Copied!');
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
-            <Check className="h-3 w-3" /> Active
-          </span>
-        );
-      case 'pending':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-            <Clock className="h-3 w-3" /> Pending
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/30">
-            Inactive
-          </span>
-        );
-    }
+  const toggle = (path: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(path) ? next.delete(path) : next.add(path);
+      return next;
+    });
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  if (!domain) {
-    return (
-      <div className="p-6 lg:p-8 text-center">
-        <p className="text-slate-400">Domain not found</p>
-        <Link to="/" className="text-blue-400 hover:underline mt-2 inline-block">
-          Back to domains
-        </Link>
-      </div>
-    );
-  }
+  if (!domain) return null;
 
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-8 max-w-4xl">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link
-          to="/"
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5" />
+      <div className="flex items-center gap-4 mb-8">
+        <Link to="/" className="text-slate-400 hover:text-white">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
         </Link>
         <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <Globe className="h-6 w-6 text-blue-400" />
-            <h1 className="text-2xl font-bold text-white">{domain.domain_name}</h1>
-            {getStatusBadge(domain.status)}
-          </div>
+          <h1 className="text-2xl font-bold text-white">{domain.domain_name}</h1>
         </div>
+        <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+          domain.status === 'active'
+            ? 'bg-green-500/20 text-green-400'
+            : domain.status === 'pending'
+            ? 'bg-yellow-500/20 text-yellow-400'
+            : 'bg-slate-500/20 text-slate-400'
+        }`}>
+          {domain.status}
+        </span>
         <button
-          onClick={handleStatusToggle}
+          onClick={toggleStatus}
           className={`px-4 py-2 rounded-lg font-medium transition-colors ${
             domain.status === 'active'
               ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
@@ -211,174 +159,116 @@ export function DomainDetailPage() {
         </button>
       </div>
 
-      {/* Target URL Section */}
-      <div className="p-5 bg-slate-800/50 rounded-xl border border-slate-700">
+      {/* Target URL */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 mb-6">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-medium text-slate-400">Target URL</h2>
-          {!isEditingTarget && (
-            <button
-              onClick={() => setIsEditingTarget(true)}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-            >
-              <Edit2 className="h-4 w-4" />
+          {!editingTarget && (
+            <button onClick={() => setEditingTarget(true)} className="text-slate-400 hover:text-white">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
             </button>
           )}
         </div>
-        {isEditingTarget ? (
+        {editingTarget ? (
           <div className="flex gap-2">
             <input
               type="url"
-              value={newTargetUrl}
-              onChange={(e) => setNewTargetUrl(e.target.value)}
-              className="flex-1 px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="https://mysite.com"
+              value={targetUrl}
+              onChange={(e) => setTargetUrl(e.target.value)}
+              className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             />
-            <button
-              onClick={handleUpdateTarget}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
+            <button onClick={saveTarget} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               Save
             </button>
-            <button
-              onClick={() => {
-                setIsEditingTarget(false);
-                setNewTargetUrl(domain.target_url || '');
-              }}
-              className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
-            >
+            <button onClick={() => { setEditingTarget(false); setTargetUrl(domain.target_url || ''); }} className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">
               Cancel
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <ArrowRight className="h-4 w-4 text-slate-500" />
-            <a
-              href={domain.target_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline flex items-center gap-1"
-            >
-              {domain.target_url || 'No target set'}
-              {domain.target_url && <ExternalLink className="h-3 w-3" />}
-            </a>
-          </div>
+          <p className="text-white">{domain.target_url || 'No target set'}</p>
         )}
-        <p className="mt-2 text-xs text-slate-500">
-          All traffic from this domain will 301 redirect here
-        </p>
+        <p className="text-xs text-slate-500 mt-2">All traffic 301 redirects here</p>
       </div>
 
-      {/* Cloudflare DNS Section */}
-      <div className="p-5 bg-slate-800/50 rounded-xl border border-slate-700">
-        <h2 className="text-lg font-semibold text-white mb-4">Cloudflare DNS Setup</h2>
-        <p className="text-slate-400 text-sm mb-4">
-          Add these DNS records in Cloudflare:
-        </p>
-        <div className="space-y-3">
-          <div className="p-4 bg-slate-900 rounded-lg border border-slate-700 flex items-center justify-between">
-            <div className="font-mono text-sm space-y-1">
-              <p className="text-slate-400">Type: <span className="text-white">A</span> | Name: <span className="text-white">@</span> | Content: <span className="text-blue-400">{serverIP}</span></p>
-            </div>
-            <button
-              onClick={() => copyToClipboard(serverIP)}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-            >
-              <Copy className="h-4 w-4" />
+      {/* DNS */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 mb-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Cloudflare DNS</h2>
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
+            <code className="text-sm text-slate-300">A | @ | <span className="text-blue-400">{serverIp}</span></code>
+            <button onClick={() => copy(serverIp)} className="text-slate-400 hover:text-white">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
             </button>
           </div>
-          <div className="p-4 bg-slate-900 rounded-lg border border-slate-700 flex items-center justify-between">
-            <div className="font-mono text-sm space-y-1">
-              <p className="text-slate-400">Type: <span className="text-white">A</span> | Name: <span className="text-white">www</span> | Content: <span className="text-blue-400">{serverIP}</span></p>
-            </div>
-            <button
-              onClick={() => copyToClipboard(serverIP)}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-            >
-              <Copy className="h-4 w-4" />
+          <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
+            <code className="text-sm text-slate-300">A | www | <span className="text-blue-400">{serverIp}</span></code>
+            <button onClick={() => copy(serverIp)} className="text-slate-400 hover:text-white">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
             </button>
           </div>
         </div>
-        <p className="mt-4 text-xs text-amber-400">
-          Enable the proxy (orange cloud) and set SSL mode to "Full"
-        </p>
+        <p className="text-xs text-yellow-400">Enable proxy (orange cloud) • SSL mode: Full</p>
       </div>
 
-      {/* Backlinks Section */}
-      <div className="p-5 bg-slate-800/50 rounded-xl border border-slate-700">
+      {/* Backlinks */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white">
-            Backlinks
-            <span className="ml-2 text-sm font-normal text-slate-400">
-              ({domain.backlink_count || 0} total)
-            </span>
+            Backlinks <span className="text-sm font-normal text-slate-400">({domain.backlink_count || 0})</span>
           </h2>
           <div className="flex gap-2">
-            {groupedBacklinks.length > 0 && (
-              <button
-                onClick={handleClearBacklinks}
-                className="px-3 py-1.5 text-sm text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-              >
+            {backlinks.length > 0 && (
+              <button onClick={clearBacklinks} className="px-3 py-1.5 text-sm text-red-400 hover:bg-red-500/20 rounded-lg">
                 Clear All
               </button>
             )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.txt"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
+            <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleUpload} className="hidden" />
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              <Upload className="h-4 w-4" />
-              {uploading ? 'Uploading...' : 'Upload CSV/TXT'}
+              {uploading ? 'Uploading...' : 'Upload CSV'}
             </button>
           </div>
         </div>
 
-        <p className="text-slate-400 text-sm mb-4">
-          Format: <code className="bg-slate-900 px-2 py-0.5 rounded text-xs">linking_site,url_path</code> (e.g., <code className="bg-slate-900 px-2 py-0.5 rounded text-xs">example.com,/old-page</code>)
+        <p className="text-sm text-slate-400 mb-4">
+          Format: <code className="bg-slate-900 px-2 py-0.5 rounded text-xs">linking_site,url_path</code>
         </p>
 
-        {groupedBacklinks.length === 0 ? (
-          <div className="text-center py-12 text-slate-500">
-            <Upload className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p>No backlinks uploaded yet</p>
-            <p className="text-sm mt-1">Upload a CSV or TXT file to see backlinks</p>
+        {backlinks.length === 0 ? (
+          <div className="text-center py-8 text-slate-500">
+            <p>No backlinks yet</p>
+            <p className="text-sm mt-1">Upload a CSV file to import backlinks</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {groupedBacklinks.map((group) => (
+            {backlinks.map((group) => (
               <div key={group.url_path} className="border border-slate-700 rounded-lg overflow-hidden">
                 <button
-                  onClick={() => togglePath(group.url_path)}
-                  className="w-full flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 transition-colors text-left"
+                  onClick={() => toggle(group.url_path)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-700/50 text-left"
                 >
-                  <div className="flex items-center gap-3">
-                    {expandedPaths.has(group.url_path) ? (
-                      <ChevronDown className="h-4 w-4 text-slate-400" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-slate-400" />
-                    )}
-                    <span className="font-mono text-white">{group.url_path}</span>
+                  <div className="flex items-center gap-2">
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${expanded.has(group.url_path) ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    <code className="text-white">{group.url_path}</code>
                   </div>
-                  <span className="text-sm text-slate-400">
-                    {group.count} backlink{group.count !== 1 ? 's' : ''}
-                  </span>
+                  <span className="text-sm text-slate-400">{group.count} backlinks</span>
                 </button>
-                {expandedPaths.has(group.url_path) && (
-                  <div className="border-t border-slate-700 bg-slate-900/50 p-4">
-                    <div className="space-y-2">
-                      {group.linking_sites.map((site, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          <span className="text-slate-500">•</span>
-                          <span className="text-slate-300">{site}</span>
-                        </div>
-                      ))}
-                    </div>
+                {expanded.has(group.url_path) && (
+                  <div className="p-3 bg-slate-900/50 border-t border-slate-700 space-y-1">
+                    {group.linking_sites.map((site, i) => (
+                      <div key={i} className="text-sm text-slate-300 pl-6">• {site}</div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -387,56 +277,37 @@ export function DomainDetailPage() {
         )}
       </div>
 
-      {/* Delete Domain */}
-      <div className="p-5 bg-red-500/10 rounded-xl border border-red-500/30">
+      {/* Delete */}
+      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-white font-medium">Delete Domain</h3>
-            <p className="text-sm text-slate-400 mt-1">
-              Permanently delete this domain and all its backlinks
-            </p>
+            <p className="text-sm text-slate-400">Permanently remove this domain</p>
           </div>
           <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+            onClick={() => setShowDelete(true)}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
-            <Trash2 className="h-4 w-4" />
+            Delete
           </button>
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-slate-800 rounded-xl border border-slate-700 shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-slate-700">
-              <h2 className="text-lg font-semibold text-white">Delete Domain</h2>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                <XIcon className="h-5 w-5" />
+      {/* Delete Modal */}
+      {showDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Delete Domain?</h2>
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to delete <strong>{domain.domain_name}</strong>? This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDelete(false)} className="flex-1 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">
+                Cancel
               </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-slate-300">
-                Are you sure you want to delete <strong className="text-white">{domain.domain_name}</strong>?
-                This will also delete all associated backlinks.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 px-4 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-600 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteDomain}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
+              <button onClick={deleteDomain} className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                Delete
+              </button>
             </div>
           </div>
         </div>

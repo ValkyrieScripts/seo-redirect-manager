@@ -9,6 +9,8 @@ import {
   LogOut,
   Menu,
   X,
+  Settings,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +24,8 @@ const navItems = [
   { to: '/redirects', icon: ArrowRightLeft, label: 'Redirects' },
   { to: '/backlinks', icon: Link2, label: 'Backlinks' },
   { to: '/export', icon: FileDown, label: 'Export' },
+  { to: '/instructions', icon: BookOpen, label: 'Instructions' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export function Sidebar() {

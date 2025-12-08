@@ -7,3 +7,5 @@ export { ProjectDetailPage } from './ProjectDetailPage';
 export { RedirectsPage } from './RedirectsPage';
 export { BacklinksPage } from './BacklinksPage';
 export { ExportPage } from './ExportPage';
+export { SettingsPage } from './SettingsPage';
+export { InstructionsPage } from './InstructionsPage';

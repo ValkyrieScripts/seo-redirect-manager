@@ -11,4 +11,8 @@ export const authApi = {
     const response = await client.get<{ user: User }>('/auth/verify');
     return response.data.user;
   },
+
+  changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
+    await client.post('/auth/change-password', { currentPassword, newPassword });
+  },
 };

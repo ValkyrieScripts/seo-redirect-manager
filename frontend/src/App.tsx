@@ -14,6 +14,8 @@ import {
   RedirectsPage,
   BacklinksPage,
   ExportPage,
+  SettingsPage,
+  InstructionsPage,
 } from '@/pages';
 
 const queryClient = new QueryClient({
@@ -50,6 +52,8 @@ function App() {
               <Route path="/redirects" element={<RedirectsPage />} />
               <Route path="/backlinks" element={<BacklinksPage />} />
               <Route path="/export" element={<ExportPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/instructions" element={<InstructionsPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

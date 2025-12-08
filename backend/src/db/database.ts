@@ -25,7 +25,7 @@ export function getDatabase(): Database.Database {
 export function initDatabase(): void {
   const db = getDatabase();
 
-  // Create tables
+  // Create tables (base schema without new columns)
   db.exec(`
     -- Projects table (deprecated - kept for migration)
     CREATE TABLE IF NOT EXISTS projects (
@@ -37,11 +37,10 @@ export function initDatabase(): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Domains table (simplified: one target URL per domain)
+    -- Domains table
     CREATE TABLE IF NOT EXISTS domains (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       domain_name TEXT NOT NULL UNIQUE,
-      target_url TEXT NOT NULL DEFAULT '',
       status TEXT DEFAULT 'pending' CHECK(status IN ('active', 'inactive', 'pending')),
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -63,12 +62,10 @@ export function initDatabase(): void {
       UNIQUE(domain_id, source_path)
     );
 
-    -- Backlinks table (simplified: linking_site + url_path)
+    -- Backlinks table (base)
     CREATE TABLE IF NOT EXISTS backlinks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       domain_id INTEGER NOT NULL,
-      linking_site TEXT NOT NULL,
-      url_path TEXT NOT NULL DEFAULT '/',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
     );
@@ -84,7 +81,6 @@ export function initDatabase(): void {
     -- Create indexes
     CREATE INDEX IF NOT EXISTS idx_redirects_domain ON redirects(domain_id);
     CREATE INDEX IF NOT EXISTS idx_backlinks_domain ON backlinks(domain_id);
-    CREATE INDEX IF NOT EXISTS idx_backlinks_url_path ON backlinks(url_path);
   `);
 
   // Migration: Add target_url column to domains if it doesn't exist
@@ -95,14 +91,34 @@ export function initDatabase(): void {
     // Column already exists, ignore
   }
 
+  // Migration: Add url_path column to backlinks if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE backlinks ADD COLUMN url_path TEXT NOT NULL DEFAULT '/'`);
+    console.log('Migration: Added url_path column to backlinks');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   // Migration: Add linking_site column to backlinks if it doesn't exist (for old schema)
   try {
     db.exec(`ALTER TABLE backlinks ADD COLUMN linking_site TEXT NOT NULL DEFAULT ''`);
-    // Migrate data: copy referring_domain to linking_site if it exists
-    db.exec(`UPDATE backlinks SET linking_site = referring_domain WHERE linking_site = '' AND referring_domain IS NOT NULL`);
     console.log('Migration: Added linking_site column to backlinks');
   } catch (e) {
     // Column already exists, ignore
+  }
+
+  // Migration: Copy referring_domain to linking_site if old schema exists
+  try {
+    db.exec(`UPDATE backlinks SET linking_site = referring_domain WHERE linking_site = '' AND referring_domain IS NOT NULL`);
+  } catch (e) {
+    // referring_domain column doesn't exist, ignore
+  }
+
+  // Create url_path index after migration
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_backlinks_url_path ON backlinks(url_path)`);
+  } catch (e) {
+    // Index might already exist
   }
 
   // Create default admin user if none exists

@@ -6,8 +6,8 @@ COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 # Copy Lua scripts
 COPY lua /etc/nginx/lua
 
-# Create conf.d directory
-RUN mkdir -p /etc/nginx/conf.d
+# Create required directories
+RUN mkdir -p /etc/nginx/conf.d /var/log/openresty
 
 EXPOSE 80
 

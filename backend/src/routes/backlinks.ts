@@ -85,7 +85,7 @@ router.post('/import', authenticateToken, async (req: AuthRequest, res: Response
     if (!line) continue;
 
     // Split by comma, handling potential quoted values
-    const parts = line.split(',').map(p => p.trim());
+    const parts = line.split(',').map((p: string) => p.trim());
 
     if (parts.length < 2) {
       errors.push(`Line ${i + 1}: Invalid format (expected: linking_url,path)`);

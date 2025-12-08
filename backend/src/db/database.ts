@@ -1,9 +1,9 @@
-import Database from 'better-sqlite3';
+import Database, { Database as DatabaseType } from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import path from 'path';
 
 const dbPath = path.join(__dirname, '../../data/seo-redirects.db');
-const db = new Database(dbPath);
+const db: DatabaseType = new Database(dbPath);
 
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL');

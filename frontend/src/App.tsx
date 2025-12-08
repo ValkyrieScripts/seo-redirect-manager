@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import DomainDetailPage from './pages/DomainDetailPage';
+import InstructionsPage from './pages/InstructionsPage';
 import SettingsPage from './pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -49,6 +50,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <DomainDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/instructions"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <InstructionsPage />
             </Layout>
           </ProtectedRoute>
         }

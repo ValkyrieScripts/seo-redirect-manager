@@ -32,6 +32,16 @@ export default function Layout({ children }: LayoutProps) {
                   Domains
                 </Link>
                 <Link
+                  to="/instructions"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    location.pathname === '/instructions'
+                      ? 'bg-gray-900 text-white'
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  }`}
+                >
+                  Instructions
+                </Link>
+                <Link
                   to="/settings"
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
                     location.pathname === '/settings'

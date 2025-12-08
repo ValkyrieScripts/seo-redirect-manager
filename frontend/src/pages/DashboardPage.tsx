@@ -182,6 +182,8 @@ interface AddDomainModalProps {
 }
 
 function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
+  const [step, setStep] = useState<'form' | 'instructions'>('form');
+  const [createdDomain, setCreatedDomain] = useState<Domain | null>(null);
   const [domainName, setDomainName] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
   const [redirectMode, setRedirectMode] = useState<'full' | 'path-specific'>('full');
@@ -203,13 +205,113 @@ function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
         unmatched_behavior: unmatchedBehavior,
         notes: notes || undefined,
       });
-      onAdd(domain);
+      setCreatedDomain(domain);
+      setStep('instructions');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create domain');
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleFinish = () => {
+    if (createdDomain) {
+      onAdd(createdDomain);
+    }
+    onClose();
+  };
+
+  if (step === 'instructions' && createdDomain) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+          <div className="flex items-center mb-4">
+            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center mr-3">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-white">Domain Added!</h2>
+          </div>
+
+          <div className="bg-gray-700 rounded-lg p-4 mb-4">
+            <p className="text-gray-300 text-sm mb-2">
+              <span className="text-gray-400">Domain:</span> <span className="text-white font-mono">{createdDomain.domain_name}</span>
+            </p>
+            <p className="text-gray-300 text-sm">
+              <span className="text-gray-400">Target:</span> <span className="text-blue-400">{createdDomain.target_url}</span>
+            </p>
+          </div>
+
+          <h3 className="text-lg font-semibold text-white mb-3">Cloudflare DNS Setup</h3>
+
+          <div className="bg-gray-900 rounded-lg p-4 mb-4">
+            <p className="text-gray-400 text-sm mb-3">Add these DNS records in Cloudflare for <span className="text-white font-mono">{createdDomain.domain_name}</span>:</p>
+
+            <div className="space-y-2 font-mono text-sm">
+              <div className="flex items-center justify-between bg-gray-800 rounded px-3 py-2">
+                <span className="text-gray-400">Type:</span>
+                <span className="text-green-400">A</span>
+              </div>
+              <div className="flex items-center justify-between bg-gray-800 rounded px-3 py-2">
+                <span className="text-gray-400">Name:</span>
+                <span className="text-yellow-400">@</span>
+              </div>
+              <div className="flex items-center justify-between bg-gray-800 rounded px-3 py-2">
+                <span className="text-gray-400">Content:</span>
+                <span className="text-blue-400">89.147.108.50</span>
+              </div>
+              <div className="flex items-center justify-between bg-gray-800 rounded px-3 py-2">
+                <span className="text-gray-400">Proxy:</span>
+                <span className="text-orange-400">Proxied (orange cloud)</span>
+              </div>
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-gray-700">
+              <p className="text-gray-400 text-xs mb-2">Also add for www:</p>
+              <div className="flex items-center justify-between bg-gray-800 rounded px-3 py-2 font-mono text-sm">
+                <span className="text-gray-400">Name:</span>
+                <span className="text-yellow-400">www</span>
+                <span className="text-gray-400">-&gt;</span>
+                <span className="text-blue-400">89.147.108.50</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-3 mb-4">
+            <p className="text-yellow-200 text-sm">
+              <strong>Important:</strong> Set SSL/TLS mode to <span className="font-mono bg-yellow-900/50 px-1 rounded">Full</span> in Cloudflare SSL/TLS settings.
+            </p>
+          </div>
+
+          <div className="text-gray-400 text-sm mb-4">
+            <p>Next steps:</p>
+            <ol className="list-decimal list-inside mt-2 space-y-1">
+              <li>Configure Cloudflare DNS as shown above</li>
+              <li>Import your backlinks (optional)</li>
+              <li>Activate the domain when ready</li>
+            </ol>
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <Link
+              to={`/domain/${createdDomain.id}`}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors"
+              onClick={() => onAdd(createdDomain)}
+            >
+              Go to Domain
+            </Link>
+            <button
+              onClick={handleFinish}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">

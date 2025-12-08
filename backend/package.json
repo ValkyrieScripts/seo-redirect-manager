@@ -1,41 +1,32 @@
 {
-  "name": "seo-redirect-manager-backend",
+  "name": "seo-redirect-backend",
   "version": "1.0.0",
-  "description": "Backend API for SEO Domain Redirect Manager",
+  "description": "Backend API for SEO Redirect Manager",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "ts-node-dev --respawn src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "lint": "eslint src --ext .ts",
-    "migrate": "tsx src/db/migrate.ts"
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.6.0",
+    "better-sqlite3": "^9.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.21.1",
-    "express-validator": "^7.2.0",
+    "dockerode": "^4.0.2",
+    "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
-    "papaparse": "^5.4.1",
-    "uuid": "^10.0.0"
+    "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.11",
+    "@types/better-sqlite3": "^7.6.9",
     "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.0",
-    "@types/jsonwebtoken": "^9.0.7",
-    "@types/multer": "^1.4.12",
-    "@types/node": "^22.10.1",
-    "@types/papaparse": "^5.3.15",
-    "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.17.0",
-    "@typescript-eslint/parser": "^8.17.0",
-    "eslint": "^9.16.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "@types/dockerode": "^3.3.23",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.11.19",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
   }
 }

@@ -1,317 +1,542 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { domainsApi } from '../api/domains';
-import { backlinksApi } from '../api/backlinks';
-import type { Domain, GroupedBacklink } from '../types';
-import toast from 'react-hot-toast';
+import { DomainWithBacklinks, Backlink } from '../types';
+import { getDomain, updateDomain, activateDomain, deactivateDomain, deleteDomain } from '../api/domains';
+import { importBacklinks, deleteBacklink, deleteAllBacklinks } from '../api/backlinks';
 
-export function DomainDetailPage() {
+export default function DomainDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const domainId = parseInt(id || '0');
+  const [domain, setDomain] = useState<DomainWithBacklinks | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
-  const [domain, setDomain] = useState<Domain | null>(null);
-  const [backlinks, setBacklinks] = useState<GroupedBacklink[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [editingTarget, setEditingTarget] = useState(false);
-  const [targetUrl, setTargetUrl] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
-
-  const serverIp = '89.147.108.50';
+  const loadDomain = async () => {
+    if (!id) return;
+    try {
+      const data = await getDomain(parseInt(id));
+      setDomain(data);
+    } catch (err: any) {
+      setError('Failed to load domain');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!domainId) return;
-    loadData();
-  }, [domainId]);
+    loadDomain();
+  }, [id]);
 
-  const loadData = async () => {
-    try {
-      const [d, b] = await Promise.all([
-        domainsApi.get(domainId),
-        backlinksApi.getGrouped(domainId),
-      ]);
-      setDomain(d);
-      setBacklinks(b);
-      setTargetUrl(d.target_url || '');
-    } catch {
-      toast.error('Failed to load domain');
-      navigate('/');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveTarget = async () => {
-    try {
-      await domainsApi.update(domainId, { target_url: targetUrl });
-      toast.success('Target updated');
-      setEditingTarget(false);
-      loadData();
-    } catch {
-      toast.error('Failed to update');
-    }
-  };
-
-  const toggleStatus = async () => {
+  const handleToggleStatus = async () => {
     if (!domain) return;
-    const newStatus = domain.status === 'active' ? 'inactive' : 'active';
     try {
-      await domainsApi.update(domainId, { status: newStatus });
-      toast.success(newStatus === 'active' ? 'Activated' : 'Deactivated');
-      loadData();
-    } catch {
-      toast.error('Failed to update status');
+      const updated =
+        domain.status === 'active'
+          ? await deactivateDomain(domain.id)
+          : await activateDomain(domain.id);
+      setDomain({ ...domain, ...updated });
+    } catch (err: any) {
+      setError('Failed to update status');
     }
   };
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const result = await backlinksApi.import(domainId, file);
-      toast.success(`Imported ${result.imported} backlinks`);
-      loadData();
-    } catch {
-      toast.error('Failed to import');
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
+  const handleDelete = async () => {
+    if (!domain) return;
+    if (!confirm(`Are you sure you want to delete ${domain.domain_name}?`)) return;
 
-  const clearBacklinks = async () => {
     try {
-      await backlinksApi.deleteAll(domainId);
-      toast.success('Backlinks cleared');
-      loadData();
-    } catch {
-      toast.error('Failed to clear');
-    }
-  };
-
-  const deleteDomain = async () => {
-    try {
-      await domainsApi.delete(domainId);
-      toast.success('Domain deleted');
+      await deleteDomain(domain.id);
       navigate('/');
-    } catch {
-      toast.error('Failed to delete');
+    } catch (err: any) {
+      setError('Failed to delete domain');
     }
   };
 
-  const copy = (text: string) => {
+  const handleDeleteBacklink = async (backlink: Backlink) => {
+    if (!domain) return;
+    try {
+      await deleteBacklink(backlink.id);
+      setDomain({
+        ...domain,
+        backlinks: domain.backlinks.filter((b) => b.id !== backlink.id),
+        backlink_count: domain.backlink_count - 1,
+      });
+    } catch (err: any) {
+      setError('Failed to delete backlink');
+    }
+  };
+
+  const handleClearAllBacklinks = async () => {
+    if (!domain) return;
+    if (!confirm('Are you sure you want to delete all backlinks?')) return;
+
+    try {
+      await deleteAllBacklinks(domain.id);
+      setDomain({ ...domain, backlinks: [], backlink_count: 0 });
+    } catch (err: any) {
+      setError('Failed to clear backlinks');
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('Copied!');
   };
 
-  const toggle = (path: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.has(path) ? next.delete(path) : next.add(path);
-      return next;
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+  if (isLoading) {
+    return <div className="text-gray-400">Loading domain...</div>;
   }
 
-  if (!domain) return null;
+  if (!domain) {
+    return <div className="text-red-400">Domain not found</div>;
+  }
+
+  // Group backlinks by path
+  const groupedBacklinks: { [path: string]: Backlink[] } = {};
+  domain.backlinks.forEach((backlink) => {
+    if (!groupedBacklinks[backlink.url_path]) {
+      groupedBacklinks[backlink.url_path] = [];
+    }
+    groupedBacklinks[backlink.url_path].push(backlink);
+  });
 
   return (
-    <div className="p-8 max-w-4xl">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
-        <Link to="/" className="text-slate-400 hover:text-white">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+    <div>
+      <div className="mb-6">
+        <Link to="/" className="text-gray-400 hover:text-white text-sm">
+          &larr; Back to Domains
         </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-white">{domain.domain_name}</h1>
-        </div>
-        <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-          domain.status === 'active'
-            ? 'bg-green-500/20 text-green-400'
-            : domain.status === 'pending'
-            ? 'bg-yellow-500/20 text-yellow-400'
-            : 'bg-slate-500/20 text-slate-400'
-        }`}>
-          {domain.status}
-        </span>
-        <button
-          onClick={toggleStatus}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            domain.status === 'active'
-              ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-              : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-          }`}
-        >
-          {domain.status === 'active' ? 'Deactivate' : 'Activate'}
-        </button>
       </div>
 
-      {/* Target URL */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-medium text-slate-400">Target URL</h2>
-          {!editingTarget && (
-            <button onClick={() => setEditingTarget(true)} className="text-slate-400 hover:text-white">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </button>
-          )}
+      {error && (
+        <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">
+          {error}
         </div>
-        {editingTarget ? (
-          <div className="flex gap-2">
-            <input
-              type="url"
-              value={targetUrl}
-              onChange={(e) => setTargetUrl(e.target.value)}
-              className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-            />
-            <button onClick={saveTarget} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-              Save
+      )}
+
+      {/* Domain Header */}
+      <div className="bg-gray-800 rounded-lg p-6 mb-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold text-white">{domain.domain_name}</h1>
+            <p className="text-gray-400 mt-1">
+              Target: <a href={domain.target_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">{domain.target_url}</a>
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleToggleStatus}
+              className={`px-4 py-2 rounded-md font-medium ${
+                domain.status === 'active'
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-gray-600 hover:bg-gray-500 text-white'
+              }`}
+            >
+              {domain.status === 'active' ? 'Active' : 'Inactive'}
             </button>
-            <button onClick={() => { setEditingTarget(false); setTargetUrl(domain.target_url || ''); }} className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">
-              Cancel
+            <button
+              onClick={() => setIsEditing(true)}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md"
+            >
+              Edit
+            </button>
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md"
+            >
+              Delete
             </button>
           </div>
-        ) : (
-          <p className="text-white">{domain.target_url || 'No target set'}</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mt-6">
+          <div className="bg-gray-700 rounded p-4">
+            <div className="text-gray-400 text-sm">Mode</div>
+            <div className="text-white font-medium">{domain.redirect_mode}</div>
+          </div>
+          <div className="bg-gray-700 rounded p-4">
+            <div className="text-gray-400 text-sm">Unmatched Paths</div>
+            <div className="text-white font-medium">{domain.unmatched_behavior}</div>
+          </div>
+          <div className="bg-gray-700 rounded p-4">
+            <div className="text-gray-400 text-sm">Backlinks</div>
+            <div className="text-white font-medium">{domain.backlink_count}</div>
+          </div>
+        </div>
+
+        {domain.notes && (
+          <div className="mt-4 p-3 bg-gray-700 rounded">
+            <div className="text-gray-400 text-sm mb-1">Notes</div>
+            <div className="text-gray-200">{domain.notes}</div>
+          </div>
         )}
-        <p className="text-xs text-slate-500 mt-2">All traffic 301 redirects here</p>
       </div>
 
-      {/* DNS */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 mb-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Cloudflare DNS</h2>
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-            <code className="text-sm text-slate-300">A | @ | <span className="text-blue-400">{serverIp}</span></code>
-            <button onClick={() => copy(serverIp)} className="text-slate-400 hover:text-white">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
+      {/* Cloudflare Instructions */}
+      <div className="bg-gray-800 rounded-lg p-6 mb-6">
+        <h2 className="text-lg font-bold text-white mb-4">Cloudflare DNS Setup</h2>
+        <div className="bg-gray-700 rounded p-4 font-mono text-sm">
+          <p className="text-gray-300">Add these A records in Cloudflare:</p>
+          <div className="mt-2 space-y-1">
+            <p className="text-green-400">@ → 89.147.108.50 (Proxied)</p>
+            <p className="text-green-400">www → 89.147.108.50 (Proxied)</p>
           </div>
-          <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-            <code className="text-sm text-slate-300">A | www | <span className="text-blue-400">{serverIp}</span></code>
-            <button onClick={() => copy(serverIp)} className="text-slate-400 hover:text-white">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
-          </div>
+          <p className="text-gray-400 mt-3">SSL/TLS Mode: Full</p>
         </div>
-        <p className="text-xs text-yellow-400">Enable proxy (orange cloud) • SSL mode: Full</p>
       </div>
 
-      {/* Backlinks */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">
-            Backlinks <span className="text-sm font-normal text-slate-400">({domain.backlink_count || 0})</span>
-          </h2>
-          <div className="flex gap-2">
-            {backlinks.length > 0 && (
-              <button onClick={clearBacklinks} className="px-3 py-1.5 text-sm text-red-400 hover:bg-red-500/20 rounded-lg">
+      {/* Backlinks Section */}
+      <div className="bg-gray-800 rounded-lg p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-bold text-white">Backlinks</h2>
+          <div className="space-x-3">
+            {domain.backlinks.length > 0 && (
+              <button
+                onClick={handleClearAllBacklinks}
+                className="px-3 py-1 text-red-400 hover:text-red-300 text-sm"
+              >
                 Clear All
               </button>
             )}
-            <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleUpload} className="hidden" />
             <button
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              onClick={() => setShowImportModal(true)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
             >
-              {uploading ? 'Uploading...' : 'Upload CSV'}
+              Import Backlinks
             </button>
           </div>
         </div>
 
-        <p className="text-sm text-slate-400 mb-4">
-          Format: <code className="bg-slate-900 px-2 py-0.5 rounded text-xs">linking_site,url_path</code>
-        </p>
-
-        {backlinks.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
-            <p>No backlinks yet</p>
-            <p className="text-sm mt-1">Upload a CSV file to import backlinks</p>
+        {domain.backlinks.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-400">No backlinks imported yet.</p>
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="mt-2 text-blue-400 hover:text-blue-300"
+            >
+              Import backlinks
+            </button>
           </div>
         ) : (
-          <div className="space-y-2">
-            {backlinks.map((group) => (
-              <div key={group.url_path} className="border border-slate-700 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggle(group.url_path)}
-                  className="w-full flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-700/50 text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${expanded.has(group.url_path) ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                    <code className="text-white">{group.url_path}</code>
-                  </div>
-                  <span className="text-sm text-slate-400">{group.count} backlinks</span>
-                </button>
-                {expanded.has(group.url_path) && (
-                  <div className="p-3 bg-slate-900/50 border-t border-slate-700 space-y-1">
-                    {group.linking_sites.map((site, i) => (
-                      <div key={i} className="text-sm text-slate-300 pl-6">• {site}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
+          <div className="space-y-4">
+            {Object.entries(groupedBacklinks).map(([path, backlinks]) => (
+              <BacklinkGroup
+                key={path}
+                path={path}
+                backlinks={backlinks}
+                onDelete={handleDeleteBacklink}
+                onCopy={copyToClipboard}
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* Delete */}
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-white font-medium">Delete Domain</h3>
-            <p className="text-sm text-slate-400">Permanently remove this domain</p>
-          </div>
-          <button
-            onClick={() => setShowDelete(true)}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
+      {/* Edit Modal */}
+      {isEditing && (
+        <EditDomainModal
+          domain={domain}
+          onClose={() => setIsEditing(false)}
+          onSave={(updated) => {
+            setDomain({ ...domain, ...updated });
+            setIsEditing(false);
+          }}
+        />
+      )}
 
-      {/* Delete Modal */}
-      {showDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Delete Domain?</h2>
-            <p className="text-slate-300 mb-6">
-              Are you sure you want to delete <strong>{domain.domain_name}</strong>? This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDelete(false)} className="flex-1 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">
-                Cancel
-              </button>
-              <button onClick={deleteDomain} className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                Delete
-              </button>
+      {/* Import Modal */}
+      {showImportModal && (
+        <ImportBacklinksModal
+          domainId={domain.id}
+          onClose={() => setShowImportModal(false)}
+          onImport={(newBacklinks) => {
+            setDomain({
+              ...domain,
+              backlinks: [...domain.backlinks, ...newBacklinks],
+              backlink_count: domain.backlink_count + newBacklinks.length,
+            });
+            setShowImportModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+interface BacklinkGroupProps {
+  path: string;
+  backlinks: Backlink[];
+  onDelete: (backlink: Backlink) => void;
+  onCopy: (text: string) => void;
+}
+
+function BacklinkGroup({ path, backlinks, onDelete, onCopy }: BacklinkGroupProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="border border-gray-700 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-650 flex justify-between items-center text-left"
+      >
+        <div>
+          <span className="text-white font-mono">{path}</span>
+          <span className="ml-3 text-gray-400 text-sm">({backlinks.length} backlinks)</span>
+        </div>
+        <span className="text-gray-400">{isExpanded ? '▼' : '▶'}</span>
+      </button>
+
+      {isExpanded && (
+        <div className="divide-y divide-gray-700">
+          {backlinks.map((backlink) => (
+            <div key={backlink.id} className="px-4 py-3 flex justify-between items-center hover:bg-gray-750">
+              <a
+                href={backlink.linking_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 text-sm truncate max-w-xl"
+              >
+                {backlink.linking_url}
+              </a>
+              <div className="flex items-center space-x-2 ml-4">
+                <button
+                  onClick={() => onCopy(backlink.linking_url)}
+                  className="text-gray-400 hover:text-white text-sm"
+                  title="Copy URL"
+                >
+                  Copy
+                </button>
+                <button
+                  onClick={() => onDelete(backlink)}
+                  className="text-red-400 hover:text-red-300 text-sm"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+interface EditDomainModalProps {
+  domain: DomainWithBacklinks;
+  onClose: () => void;
+  onSave: (domain: DomainWithBacklinks) => void;
+}
+
+function EditDomainModal({ domain, onClose, onSave }: EditDomainModalProps) {
+  const [targetUrl, setTargetUrl] = useState(domain.target_url);
+  const [redirectMode, setRedirectMode] = useState(domain.redirect_mode);
+  const [unmatchedBehavior, setUnmatchedBehavior] = useState(domain.unmatched_behavior);
+  const [notes, setNotes] = useState(domain.notes || '');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const updated = await updateDomain(domain.id, {
+        target_url: targetUrl,
+        redirect_mode: redirectMode,
+        unmatched_behavior: unmatchedBehavior,
+        notes: notes || undefined,
+      });
+      onSave({ ...domain, ...updated });
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update domain');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold text-white mb-4">Edit Domain</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded text-sm">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Target URL
+            </label>
+            <input
+              type="url"
+              value={targetUrl}
+              onChange={(e) => setTargetUrl(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Redirect Mode
+            </label>
+            <select
+              value={redirectMode}
+              onChange={(e) => setRedirectMode(e.target.value as 'full' | 'path-specific')}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="full">Full Domain</option>
+              <option value="path-specific">Path-Specific</option>
+            </select>
+          </div>
+
+          {redirectMode === 'path-specific' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Unmatched Paths
+              </label>
+              <select
+                value={unmatchedBehavior}
+                onChange={(e) => setUnmatchedBehavior(e.target.value as '404' | 'homepage')}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="homepage">Redirect to target</option>
+                <option value="404">Return 404</option>
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={2}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-400 hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md"
+            >
+              {isLoading ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+interface ImportBacklinksModalProps {
+  domainId: number;
+  onClose: () => void;
+  onImport: (backlinks: Backlink[]) => void;
+}
+
+function ImportBacklinksModal({ domainId, onClose, onImport }: ImportBacklinksModalProps) {
+  const [csvData, setCsvData] = useState('');
+  const [error, setError] = useState('');
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setImportErrors([]);
+    setIsLoading(true);
+
+    try {
+      const result = await importBacklinks(domainId, csvData);
+      if (result.errors && result.errors.length > 0) {
+        setImportErrors(result.errors);
+      }
+      if (result.imported > 0) {
+        onImport(result.backlinks);
+      } else if (!result.errors || result.errors.length === 0) {
+        setError('No backlinks were imported');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to import backlinks');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+        <h2 className="text-xl font-bold text-white mb-4">Import Backlinks</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded text-sm">
+              {error}
+            </div>
+          )}
+
+          {importErrors.length > 0 && (
+            <div className="bg-yellow-900/50 border border-yellow-500 text-yellow-200 px-4 py-3 rounded text-sm max-h-32 overflow-auto">
+              <div className="font-medium mb-1">Import warnings:</div>
+              {importErrors.map((err, i) => (
+                <div key={i}>{err}</div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Paste backlinks (CSV format)
+            </label>
+            <textarea
+              value={csvData}
+              onChange={(e) => setCsvData(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={10}
+              placeholder="https://blog.example.com/post-about-topic,/old-page
+https://news-site.org/article,/another-path"
+              required
+            />
+            <p className="text-gray-500 text-xs mt-1">
+              Format: linking_url,path (one per line)
+            </p>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-400 hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md"
+            >
+              {isLoading ? 'Importing...' : 'Import'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

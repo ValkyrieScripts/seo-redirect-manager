@@ -1,23 +1,34 @@
 import client from './client';
-import type { GroupedBacklink } from '../types';
+import { Backlink, GroupedBacklinks } from '../types';
 
-export const backlinksApi = {
-  getGrouped: async (domainId: number): Promise<GroupedBacklink[]> => {
-    const response = await client.get(`/backlinks/grouped/${domainId}`);
-    return response.data;
-  },
+export async function getBacklinks(domainId: number): Promise<Backlink[]> {
+  const response = await client.get<Backlink[]>(`/backlinks/${domainId}`);
+  return response.data;
+}
 
-  import: async (domainId: number, file: File): Promise<{ imported: number; skipped: number }> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('domain_id', domainId.toString());
-    const response = await client.post('/backlinks/import', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data.stats;
-  },
+export async function getGroupedBacklinks(domainId: number): Promise<GroupedBacklinks[]> {
+  const response = await client.get<GroupedBacklinks[]>(`/backlinks/grouped/${domainId}`);
+  return response.data;
+}
 
-  deleteAll: async (domainId: number): Promise<void> => {
-    await client.delete(`/backlinks/domain/${domainId}`);
-  },
-};
+interface ImportResult {
+  imported: number;
+  errors?: string[];
+  backlinks: Backlink[];
+}
+
+export async function importBacklinks(domainId: number, csvData: string): Promise<ImportResult> {
+  const response = await client.post<ImportResult>('/backlinks/import', {
+    domain_id: domainId,
+    csv_data: csvData,
+  });
+  return response.data;
+}
+
+export async function deleteBacklink(id: number): Promise<void> {
+  await client.delete(`/backlinks/${id}`);
+}
+
+export async function deleteAllBacklinks(domainId: number): Promise<void> {
+  await client.delete(`/backlinks/domain/${domainId}`);
+}

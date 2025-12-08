@@ -1,41 +1,41 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 
-import { initDatabase } from './db/database';
-import { authRouter } from './routes/auth';
-import { domainsRouter } from './routes/domains';
-// import { projectsRouter } from './routes/projects'; // Deprecated
-// import { redirectsRouter } from './routes/redirects'; // Deprecated - using domain.target_url
-import { backlinksRouter } from './routes/backlinks';
-import { exportRouter } from './routes/export';
-import { nginxRouter } from './routes/nginx';
-import { authMiddleware } from './middleware/auth';
-
-dotenv.config();
+import { initializeDatabase } from './db/database';
+import authRoutes from './routes/auth';
+import domainRoutes from './routes/domains';
+import backlinkRoutes from './routes/backlinks';
+import nginxRoutes from './routes/nginx';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Ensure data directory exists
+const dataDir = path.join(__dirname, '../data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+// Ensure nginx conf directory exists
+const nginxConfDir = path.join(__dirname, '../nginx-conf');
+if (!fs.existsSync(nginxConfDir)) {
+  fs.mkdirSync(nginxConfDir, { recursive: true });
+}
 
 // Initialize database
-initDatabase();
+initializeDatabase();
 
-// Public routes
-app.use('/api/auth', authRouter);
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
 
-// Protected routes
-app.use('/api/domains', authMiddleware, domainsRouter);
-// app.use('/api/projects', authMiddleware, projectsRouter); // Deprecated
-// app.use('/api/redirects', authMiddleware, redirectsRouter); // Deprecated
-app.use('/api/backlinks', authMiddleware, backlinksRouter);
-app.use('/api/export', authMiddleware, exportRouter);
-app.use('/api/nginx', authMiddleware, nginxRouter);
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/domains', domainRoutes);
+app.use('/api/backlinks', backlinkRoutes);
+app.use('/api/nginx', nginxRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -43,13 +43,12 @@ app.get('/api/health', (req, res) => {
 });
 
 // Error handling
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`SEO Redirect Manager API running on port ${PORT}`);
 });
-
-export default app;

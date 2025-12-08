@@ -1,118 +1,111 @@
 import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { authApi } from '../api/auth';
-import toast from 'react-hot-toast';
+import { changePassword } from '../api/auth';
 
-export function SettingsPage() {
-  const { user } = useAuth();
+export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
 
     if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
+      setError('New passwords do not match');
       return;
     }
 
     if (newPassword.length < 4) {
-      toast.error('Password must be at least 4 characters');
+      setError('Password must be at least 4 characters');
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
+
     try {
-      await authApi.changePassword(currentPassword, newPassword);
-      toast.success('Password changed!');
+      await changePassword(currentPassword, newPassword);
+      setSuccess('Password changed successfully');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to change password');
+      setError(err.response?.data?.error || 'Failed to change password');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="p-8 max-w-2xl">
-      <h1 className="text-2xl font-bold text-white mb-8">Settings</h1>
+    <div>
+      <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
 
-      {/* Account */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 mb-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Account</h2>
-        <div className="space-y-3">
-          <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
-            <span className="text-slate-400">Username</span>
-            <span className="text-white">{user?.username}</span>
-          </div>
-          <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
-            <span className="text-slate-400">Role</span>
-            <span className="text-green-400">Admin</span>
-          </div>
-        </div>
-      </div>
+      <div className="bg-gray-800 rounded-lg p-6 max-w-md">
+        <h2 className="text-lg font-medium text-white mb-4">Change Password</h2>
 
-      {/* Password */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 mb-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Change Password</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded text-sm">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-900/50 border border-green-500 text-green-200 px-4 py-3 rounded text-sm">
+              {success}
+            </div>
+          )}
+
           <div>
-            <label className="block text-sm text-slate-300 mb-2">Current Password</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Current Password
+            </label>
             <input
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
+
           <div>
-            <label className="block text-sm text-slate-300 mb-2">New Password</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              New Password
+            </label>
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
+
           <div>
-            <label className="block text-sm text-slate-300 mb-2">Confirm Password</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Confirm New Password
+            </label>
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
+
           <button
             type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            disabled={isLoading}
+            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md transition-colors"
           >
-            {loading ? 'Saving...' : 'Change Password'}
+            {isLoading ? 'Changing...' : 'Change Password'}
           </button>
         </form>
-      </div>
-
-      {/* System */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-5">
-        <h2 className="text-lg font-semibold text-white mb-4">System</h2>
-        <div className="space-y-3">
-          <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
-            <span className="text-slate-400">Version</span>
-            <span className="text-white font-mono text-sm">1.0.0</span>
-          </div>
-          <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
-            <span className="text-slate-400">Server</span>
-            <span className="text-white font-mono text-sm">89.147.108.50</span>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -1,143 +1,71 @@
 import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
 import bcrypt from 'bcryptjs';
+import path from 'path';
 
-let db: Database.Database;
+const dbPath = path.join(__dirname, '../../data/seo-redirects.db');
+const db = new Database(dbPath);
 
-export function getDatabase(): Database.Database {
-  if (!db) {
-    const dbPath = process.env.DATABASE_PATH || './data/redirects.db';
-    const dbDir = path.dirname(dbPath);
+// Enable WAL mode for better performance
+db.pragma('journal_mode = WAL');
 
-    // Ensure directory exists
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
-
-    db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-  }
-  return db;
-}
-
-export function initDatabase(): void {
-  const db = getDatabase();
-
-  // Create tables (base schema without new columns)
+// Initialize database schema
+export function initializeDatabase() {
+  // Users table
   db.exec(`
-    -- Projects table (deprecated - kept for migration)
-    CREATE TABLE IF NOT EXISTS projects (
+    CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      base_url TEXT NOT NULL,
-      description TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
-    -- Domains table
+  // Domains table
+  db.exec(`
     CREATE TABLE IF NOT EXISTS domains (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      domain_name TEXT NOT NULL UNIQUE,
-      status TEXT DEFAULT 'pending' CHECK(status IN ('active', 'inactive', 'pending')),
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Redirects table
-    CREATE TABLE IF NOT EXISTS redirects (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      domain_id INTEGER NOT NULL,
-      source_path TEXT NOT NULL,
+      domain_name TEXT UNIQUE NOT NULL,
       target_url TEXT NOT NULL,
-      redirect_type TEXT DEFAULT '301' CHECK(redirect_type IN ('301', '302')),
-      is_regex INTEGER DEFAULT 0,
+      redirect_mode TEXT DEFAULT 'full' CHECK(redirect_mode IN ('full', 'path-specific')),
+      unmatched_behavior TEXT DEFAULT '404' CHECK(unmatched_behavior IN ('404', 'homepage')),
+      status TEXT DEFAULT 'inactive' CHECK(status IN ('active', 'inactive')),
+      notes TEXT,
       priority INTEGER DEFAULT 0,
-      hit_count INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE,
-      UNIQUE(domain_id, source_path)
-    );
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
-    -- Backlinks table (base)
+  // Backlinks table
+  db.exec(`
     CREATE TABLE IF NOT EXISTS backlinks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       domain_id INTEGER NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      linking_url TEXT NOT NULL,
+      url_path TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
-    );
-
-    -- Users table
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Create indexes
-    CREATE INDEX IF NOT EXISTS idx_redirects_domain ON redirects(domain_id);
-    CREATE INDEX IF NOT EXISTS idx_backlinks_domain ON backlinks(domain_id);
+    )
   `);
 
-  // Migration: Add target_url column to domains if it doesn't exist
-  try {
-    db.exec(`ALTER TABLE domains ADD COLUMN target_url TEXT NOT NULL DEFAULT ''`);
-    console.log('Migration: Added target_url column to domains');
-  } catch (e) {
-    // Column already exists, ignore
-  }
+  // Create indexes
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_backlinks_domain_id ON backlinks(domain_id);
+    CREATE INDEX IF NOT EXISTS idx_backlinks_url_path ON backlinks(url_path);
+    CREATE INDEX IF NOT EXISTS idx_domains_status ON domains(status);
+  `);
 
-  // Migration: Add url_path column to backlinks if it doesn't exist
-  try {
-    db.exec(`ALTER TABLE backlinks ADD COLUMN url_path TEXT NOT NULL DEFAULT '/'`);
-    console.log('Migration: Added url_path column to backlinks');
-  } catch (e) {
-    // Column already exists, ignore
-  }
+  // Create default admin user if not exists
+  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+  const adminPassword = process.env.ADMIN_PASSWORD || '1509';
 
-  // Migration: Add linking_site column to backlinks if it doesn't exist (for old schema)
-  try {
-    db.exec(`ALTER TABLE backlinks ADD COLUMN linking_site TEXT NOT NULL DEFAULT ''`);
-    console.log('Migration: Added linking_site column to backlinks');
-  } catch (e) {
-    // Column already exists, ignore
-  }
+  const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get(adminUsername);
 
-  // Migration: Copy referring_domain to linking_site if old schema exists
-  try {
-    db.exec(`UPDATE backlinks SET linking_site = referring_domain WHERE linking_site = '' AND referring_domain IS NOT NULL`);
-  } catch (e) {
-    // referring_domain column doesn't exist, ignore
-  }
-
-  // Create url_path index after migration
-  try {
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_backlinks_url_path ON backlinks(url_path)`);
-  } catch (e) {
-    // Index might already exist
-  }
-
-  // Create default admin user if none exists
-  const adminExists = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-
-  if (adminExists.count === 0) {
-    const username = process.env.ADMIN_USERNAME || 'admin';
-    const password = process.env.ADMIN_PASSWORD || 'admin123';
-    const passwordHash = bcrypt.hashSync(password, 10);
-
-    db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, passwordHash);
-    console.log(`Default admin user created: ${username}`);
-  }
-
-  console.log('Database initialized successfully');
-}
-
-export function closeDatabase(): void {
-  if (db) {
-    db.close();
+  if (!existingUser) {
+    const passwordHash = bcrypt.hashSync(adminPassword, 10);
+    db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(adminUsername, passwordHash);
+    console.log(`Created default admin user: ${adminUsername}`);
   }
 }
+
+export default db;

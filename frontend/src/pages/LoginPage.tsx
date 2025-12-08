@@ -1,84 +1,78 @@
-import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import toast from 'react-hot-toast';
 
-export function LoginPage() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+export default function LoginPage() {
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    setError('');
+    setIsLoading(true);
+
     try {
       await login(username, password);
-      toast.success('Welcome back!');
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Login failed');
+      setError(err.response?.data?.error || 'Login failed');
     } finally {
-      setSubmitting(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
+    <div className="min-h-screen flex items-center justify-center bg-gray-900 px-4">
+      <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-white">Redirector</h1>
-          <p className="text-slate-400 mt-1">Sign in to continue</p>
+          <h1 className="text-3xl font-bold text-white">SEO Redirect Manager</h1>
+          <p className="text-gray-400 mt-2">Sign in to manage your redirects</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <div className="mb-4">
-            <label className="block text-sm text-slate-300 mb-2">Username</label>
+        <form onSubmit={handleSubmit} className="bg-gray-800 rounded-lg p-8 space-y-6">
+          {error && (
+            <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
+              Username
+            </label>
             <input
+              id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter username"
               required
-              autoFocus
             />
           </div>
-          <div className="mb-6">
-            <label className="block text-sm text-slate-300 mb-2">Password</label>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+              Password
+            </label>
             <input
+              id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter password"
               required
             />
           </div>
+
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            disabled={isLoading}
+            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium rounded-md transition-colors"
           >
-            {submitting ? 'Signing in...' : 'Sign In'}
+            {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
       </div>

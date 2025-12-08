@@ -3,13 +3,21 @@ import { cn } from '@/lib/utils';
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
+  variant?: 'default' | 'glass' | 'gradient';
 }
 
-export function Card({ className, children, ...props }: CardProps) {
+export function Card({ className, children, variant = 'default', ...props }: CardProps) {
+  const variants = {
+    default: 'bg-slate-900/50 border-slate-800/50',
+    glass: 'glass-card',
+    gradient: 'border-gradient',
+  };
+
   return (
     <div
       className={cn(
-        'rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800',
+        'rounded-2xl border backdrop-blur-sm transition-all duration-300',
+        variants[variant],
         className
       )}
       {...props}
@@ -42,7 +50,7 @@ export function CardTitle({ className, children, ...props }: CardTitleProps) {
   return (
     <h3
       className={cn(
-        'text-lg font-semibold leading-none tracking-tight text-gray-900 dark:text-white',
+        'text-lg font-semibold leading-none tracking-tight text-white',
         className
       )}
       {...props}
@@ -59,7 +67,7 @@ interface CardDescriptionProps extends HTMLAttributes<HTMLParagraphElement> {
 export function CardDescription({ className, children, ...props }: CardDescriptionProps) {
   return (
     <p
-      className={cn('text-sm text-gray-500 dark:text-gray-400', className)}
+      className={cn('text-sm text-slate-400', className)}
       {...props}
     >
       {children}

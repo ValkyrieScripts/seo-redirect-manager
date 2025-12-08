@@ -1,5 +1,6 @@
 import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { Inbox } from 'lucide-react';
 
 interface TableProps extends HTMLAttributes<HTMLTableElement> {
   children: ReactNode;
@@ -7,7 +8,7 @@ interface TableProps extends HTMLAttributes<HTMLTableElement> {
 
 export function Table({ className, children, ...props }: TableProps) {
   return (
-    <div className="w-full overflow-auto">
+    <div className="w-full overflow-auto rounded-xl">
       <table
         className={cn('w-full caption-bottom text-sm', className)}
         {...props}
@@ -24,7 +25,7 @@ interface TableHeaderProps extends HTMLAttributes<HTMLTableSectionElement> {
 
 export function TableHeader({ className, children, ...props }: TableHeaderProps) {
   return (
-    <thead className={cn('[&_tr]:border-b', className)} {...props}>
+    <thead className={cn('bg-slate-800/50', className)} {...props}>
       {children}
     </thead>
   );
@@ -50,7 +51,7 @@ export function TableRow({ className, children, ...props }: TableRowProps) {
   return (
     <tr
       className={cn(
-        'border-b border-gray-200 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/50',
+        'border-b border-slate-800/50 transition-colors duration-200 hover:bg-slate-800/30',
         className
       )}
       {...props}
@@ -68,7 +69,7 @@ export function TableHead({ className, children, ...props }: TableHeadProps) {
   return (
     <th
       className={cn(
-        'h-12 px-4 text-left align-middle font-medium text-gray-500 dark:text-gray-400 [&:has([role=checkbox])]:pr-0',
+        'h-12 px-4 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-400 [&:has([role=checkbox])]:pr-0',
         className
       )}
       {...props}
@@ -86,7 +87,7 @@ export function TableCell({ className, children, ...props }: TableCellProps) {
   return (
     <td
       className={cn(
-        'p-4 align-middle text-gray-900 dark:text-gray-100 [&:has([role=checkbox])]:pr-0',
+        'p-4 align-middle text-slate-300 [&:has([role=checkbox])]:pr-0',
         className
       )}
       {...props}
@@ -104,9 +105,14 @@ interface TableEmptyProps {
 
 export function TableEmpty({ message = 'No data found', colSpan }: TableEmptyProps) {
   return (
-    <TableRow>
-      <TableCell colSpan={colSpan} className="h-24 text-center text-gray-500">
-        {message}
+    <TableRow className="hover:bg-transparent">
+      <TableCell colSpan={colSpan} className="h-32 text-center">
+        <div className="flex flex-col items-center justify-center gap-2">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/50">
+            <Inbox className="h-6 w-6 text-slate-500" />
+          </div>
+          <p className="text-slate-500">{message}</p>
+        </div>
       </TableCell>
     </TableRow>
   );

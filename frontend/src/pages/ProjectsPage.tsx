@@ -134,10 +134,15 @@ export function ProjectsPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-fade-in">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projects</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-pink-600">
+              <FolderKanban className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white">Projects</h1>
+          </div>
+          <p className="text-slate-400">
             Organize domains into projects
           </p>
         </div>
@@ -148,22 +153,22 @@ export function ProjectsPage() {
       </div>
 
       {/* Search */}
-      <Card>
+      <Card className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
         <CardContent className="p-4">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <Input
               placeholder="Search projects..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="pl-11"
             />
           </div>
         </CardContent>
       </Card>
 
       {/* Projects Table */}
-      <Card>
+      <Card className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -181,16 +186,18 @@ export function ProjectsPage() {
               filteredProjects.map((project) => (
                 <TableRow key={project.id}>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <FolderKanban className="h-4 w-4 text-primary-600" />
-                      <span className="font-medium">{project.name}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/20 border border-purple-500/20">
+                        <FolderKanban className="h-4 w-4 text-purple-400" />
+                      </div>
+                      <span className="font-medium text-white">{project.name}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="max-w-xs truncate text-gray-500">
-                    {project.description || '-'}
+                  <TableCell className="max-w-xs truncate text-slate-400">
+                    {project.description || <span className="text-slate-500">-</span>}
                   </TableCell>
                   <TableCell>{project.domain_count || 0}</TableCell>
-                  <TableCell>{formatDate(project.created_at)}</TableCell>
+                  <TableCell className="text-slate-400">{formatDate(project.created_at)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Link to={`/projects/${project.id}`}>
@@ -211,7 +218,7 @@ export function ProjectsPage() {
                         size="icon"
                         onClick={() => setDeletingProject(project)}
                         title="Delete project"
-                        className="text-red-600 hover:text-red-700"
+                        className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -249,7 +256,7 @@ export function ProjectsPage() {
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           />
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button
               variant="outline"
               onClick={() => {
@@ -291,7 +298,7 @@ export function ProjectsPage() {
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           />
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button
               variant="outline"
               onClick={() => {
@@ -315,12 +322,16 @@ export function ProjectsPage() {
         title="Delete Project"
       >
         <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Are you sure you want to delete <strong>{deletingProject?.name}</strong>?
-            Domains in this project will not be deleted but will be unassigned.
-            This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-500/20">
+              <Trash2 className="h-5 w-5 text-rose-400" />
+            </div>
+            <p className="text-slate-300">
+              Are you sure you want to delete <strong className="text-white">{deletingProject?.name}</strong>?
+              Domains in this project will not be deleted but will be unassigned.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button variant="outline" onClick={() => setDeletingProject(null)}>
               Cancel
             </Button>

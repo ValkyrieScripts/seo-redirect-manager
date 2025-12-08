@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Trash2, Edit, Eye, Upload } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, Edit, Eye, Upload, Globe, X } from 'lucide-react';
 import { domainsApi } from '@/api/domains';
 import { projectsApi } from '@/api/projects';
 import type { Domain, Project, DomainStatus, DomainFormData } from '@/types';
@@ -205,14 +205,19 @@ export function DomainsPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-fade-in">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Domains</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600">
+              <Globe className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white">Domains</h1>
+          </div>
+          <p className="text-slate-400">
             Manage your domain redirects
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <Button variant="outline" onClick={() => setIsBulkModalOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Bulk Import
@@ -225,21 +230,21 @@ export function DomainsPage() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
         <CardContent className="p-4">
           <div className="flex flex-col gap-4 md:flex-row">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <Input
                   placeholder="Search domains..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
+                  className="pl-11"
                 />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <Select
                 options={statusOptions}
                 value={statusFilter}
@@ -252,25 +257,27 @@ export function DomainsPage() {
                 onChange={(e) => setProjectFilter(e.target.value)}
                 className="w-48"
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setSearch('');
-                  setStatusFilter('');
-                  setProjectFilter('');
-                }}
-                title="Clear filters"
-              >
-                <Filter className="h-4 w-4" />
-              </Button>
+              {(search || statusFilter || projectFilter) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setSearch('');
+                    setStatusFilter('');
+                    setProjectFilter('');
+                  }}
+                  title="Clear filters"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Domains Table */}
-      <Card>
+      <Card className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -289,14 +296,14 @@ export function DomainsPage() {
             ) : (
               filteredDomains.map((domain) => (
                 <TableRow key={domain.id}>
-                  <TableCell className="font-medium">{domain.domain}</TableCell>
-                  <TableCell>{domain.project_name || '-'}</TableCell>
+                  <TableCell className="font-medium text-white">{domain.domain}</TableCell>
+                  <TableCell>{domain.project_name || <span className="text-slate-500">-</span>}</TableCell>
                   <TableCell>
                     <StatusBadge status={domain.status} />
                   </TableCell>
                   <TableCell>{domain.redirect_count || 0}</TableCell>
                   <TableCell>{domain.backlink_count || 0}</TableCell>
-                  <TableCell>{formatDate(domain.created_at)}</TableCell>
+                  <TableCell className="text-slate-400">{formatDate(domain.created_at)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Link to={`/domains/${domain.id}`}>
@@ -317,7 +324,7 @@ export function DomainsPage() {
                         size="icon"
                         onClick={() => setDeletingDomain(domain)}
                         title="Delete domain"
-                        className="text-red-600 hover:text-red-700"
+                        className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -378,7 +385,7 @@ export function DomainsPage() {
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           />
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button
               variant="outline"
               onClick={() => {
@@ -443,7 +450,7 @@ export function DomainsPage() {
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           />
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button
               variant="outline"
               onClick={() => {
@@ -471,7 +478,7 @@ export function DomainsPage() {
         size="lg"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-slate-400">
             Enter one domain per line. Domains will be created with pending status.
           </p>
           <Textarea
@@ -482,7 +489,7 @@ export function DomainsPage() {
             onChange={(e) => setBulkDomains(e.target.value)}
             rows={10}
           />
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button
               variant="outline"
               onClick={() => {
@@ -506,11 +513,16 @@ export function DomainsPage() {
         title="Delete Domain"
       >
         <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Are you sure you want to delete <strong>{deletingDomain?.domain}</strong>? This will also
-            delete all associated redirects and backlinks. This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-500/20">
+              <Trash2 className="h-5 w-5 text-rose-400" />
+            </div>
+            <p className="text-slate-300">
+              Are you sure you want to delete <strong className="text-white">{deletingDomain?.domain}</strong>? This will also
+              delete all associated redirects and backlinks. This action cannot be undone.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button variant="outline" onClick={() => setDeletingDomain(null)}>
               Cancel
             </Button>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Search, Trash2, Edit, Upload, TestTube2 } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, Upload, TestTube2, ArrowRightLeft, X } from 'lucide-react';
 import { redirectsApi } from '@/api/redirects';
 import { domainsApi } from '@/api/domains';
 import type { Redirect, Domain, RedirectFormData, RedirectType } from '@/types';
@@ -242,14 +242,19 @@ export function RedirectsPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-fade-in">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Redirects</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600">
+              <ArrowRightLeft className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white">Redirects</h1>
+          </div>
+          <p className="text-slate-400">
             Manage redirect rules across all domains
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <Button variant="outline" onClick={() => setIsTestModalOpen(true)}>
             <TestTube2 className="mr-2 h-4 w-4" />
             Test
@@ -266,32 +271,47 @@ export function RedirectsPage() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
         <CardContent className="p-4">
           <div className="flex flex-col gap-4 md:flex-row">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <Input
                   placeholder="Search redirects..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
+                  className="pl-11"
                 />
               </div>
             </div>
-            <Select
-              options={domainOptions}
-              value={domainFilter}
-              onChange={(e) => setDomainFilter(e.target.value)}
-              className="w-48"
-            />
+            <div className="flex gap-3">
+              <Select
+                options={domainOptions}
+                value={domainFilter}
+                onChange={(e) => setDomainFilter(e.target.value)}
+                className="w-48"
+              />
+              {(search || domainFilter) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setSearch('');
+                    setDomainFilter('');
+                  }}
+                  title="Clear filters"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Redirects Table */}
-      <Card>
+      <Card className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -309,13 +329,19 @@ export function RedirectsPage() {
             ) : (
               filteredRedirects.map((redirect) => (
                 <TableRow key={redirect.id}>
-                  <TableCell className="font-medium">{redirect.domain_name || '-'}</TableCell>
-                  <TableCell className="font-mono text-sm">{redirect.source_path}</TableCell>
-                  <TableCell className="max-w-xs truncate">{truncate(redirect.target_url, 50)}</TableCell>
+                  <TableCell className="font-medium text-white">{redirect.domain_name || '-'}</TableCell>
+                  <TableCell className="font-mono text-sm text-slate-300">{redirect.source_path}</TableCell>
+                  <TableCell className="max-w-xs truncate text-slate-400">{truncate(redirect.target_url, 50)}</TableCell>
                   <TableCell>
-                    <Badge>{redirect.redirect_type}</Badge>
+                    <Badge variant="info">{redirect.redirect_type}</Badge>
                   </TableCell>
-                  <TableCell>{redirect.is_regex ? 'Yes' : 'No'}</TableCell>
+                  <TableCell>
+                    {redirect.is_regex ? (
+                      <Badge variant="purple">Yes</Badge>
+                    ) : (
+                      <span className="text-slate-500">No</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Button
@@ -331,7 +357,7 @@ export function RedirectsPage() {
                         size="icon"
                         onClick={() => setDeletingRedirect(redirect)}
                         title="Delete redirect"
-                        className="text-red-600 hover:text-red-700"
+                        className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -408,7 +434,7 @@ export function RedirectsPage() {
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           />
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button
               variant="outline"
               onClick={() => {
@@ -488,7 +514,7 @@ export function RedirectsPage() {
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           />
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button
               variant="outline"
               onClick={() => {
@@ -525,8 +551,8 @@ export function RedirectsPage() {
             onChange={(e) => setBulkDomainId(parseInt(e.target.value))}
             placeholder="Select a domain"
           />
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Enter one redirect per line in format: <code className="rounded bg-gray-100 px-1 dark:bg-gray-700">source_path,target_url,type</code>
+          <p className="text-sm text-slate-400">
+            Enter one redirect per line in format: <code className="rounded-lg bg-slate-800 px-2 py-0.5 text-primary-400">source_path,target_url,type</code>
           </p>
           <Textarea
             id="bulk-redirects"
@@ -536,7 +562,7 @@ export function RedirectsPage() {
             onChange={(e) => setBulkData(e.target.value)}
             rows={10}
           />
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button
               variant="outline"
               onClick={() => {
@@ -588,22 +614,22 @@ export function RedirectsPage() {
             }}
           />
           <Button onClick={handleTestRedirect} isLoading={isSubmitting} className="w-full">
-            Test
+            Test Redirect
           </Button>
           {testResult && (
-            <div className={`rounded-lg p-4 ${testResult.matched ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+            <div className={`rounded-xl p-4 border ${testResult.matched ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
               {testResult.matched ? (
                 <div className="space-y-2">
-                  <p className="font-medium text-green-700 dark:text-green-400">Match found!</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    <strong>Target:</strong> {testResult.target_url}
+                  <p className="font-medium text-emerald-400">Match found!</p>
+                  <p className="text-sm text-slate-400">
+                    <strong className="text-slate-300">Target:</strong> {testResult.target_url}
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    <strong>Type:</strong> {testResult.redirect_type}
+                  <p className="text-sm text-slate-400">
+                    <strong className="text-slate-300">Type:</strong> {testResult.redirect_type}
                   </p>
                 </div>
               ) : (
-                <p className="font-medium text-red-700 dark:text-red-400">No matching redirect found</p>
+                <p className="font-medium text-rose-400">No matching redirect found</p>
               )}
             </div>
           )}
@@ -617,11 +643,16 @@ export function RedirectsPage() {
         title="Delete Redirect"
       >
         <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Are you sure you want to delete the redirect from <strong>{deletingRedirect?.source_path}</strong>?
-            This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-500/20">
+              <Trash2 className="h-5 w-5 text-rose-400" />
+            </div>
+            <p className="text-slate-300">
+              Are you sure you want to delete the redirect from <strong className="text-white">{deletingRedirect?.source_path}</strong>?
+              This action cannot be undone.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
             <Button variant="outline" onClick={() => setDeletingRedirect(null)}>
               Cancel
             </Button>

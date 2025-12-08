@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Download, Copy, FileText, Code, List, Check } from 'lucide-react';
+import { Download, Copy, FileText, Code, List, Check, FileDown, FolderKanban, Globe } from 'lucide-react';
 import { exportApi } from '@/api/export';
 import { domainsApi } from '@/api/domains';
 import { projectsApi } from '@/api/projects';
@@ -212,9 +212,14 @@ export function ExportPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Export</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      <div className="animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600">
+            <FileDown className="h-5 w-5 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-white">Export</h1>
+        </div>
+        <p className="text-slate-400">
           Export redirects in various formats
         </p>
       </div>
@@ -223,10 +228,13 @@ export function ExportPage() {
         {/* Selection Panel */}
         <div className="space-y-6 lg:col-span-1">
           {/* Domains Selection */}
-          <Card>
+          <Card className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Domains</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-blue-400" />
+                  <CardTitle className="text-base">Domains</CardTitle>
+                </div>
                 <Button variant="ghost" size="sm" onClick={selectAllDomains}>
                   {selectedDomains.size === domains.length ? 'Deselect All' : 'Select All'}
                 </Button>
@@ -234,9 +242,9 @@ export function ExportPage() {
               <CardDescription>Select domains to include in export</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="max-h-48 space-y-2 overflow-y-auto">
+              <div className="max-h-48 space-y-2 overflow-y-auto scrollbar-thin">
                 {domains.length === 0 ? (
-                  <p className="text-sm text-gray-500">No domains found</p>
+                  <p className="text-sm text-slate-500">No domains found</p>
                 ) : (
                   domains.map((domain) => (
                     <div key={domain.id} className="flex items-center">
@@ -254,10 +262,13 @@ export function ExportPage() {
           </Card>
 
           {/* Projects Selection */}
-          <Card>
+          <Card className="animate-fade-in" style={{ animationDelay: '0.15s' }}>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Projects</CardTitle>
+                <div className="flex items-center gap-2">
+                  <FolderKanban className="h-4 w-4 text-purple-400" />
+                  <CardTitle className="text-base">Projects</CardTitle>
+                </div>
                 <Button variant="ghost" size="sm" onClick={selectAllProjects}>
                   {selectedProjects.size === projects.length ? 'Deselect All' : 'Select All'}
                 </Button>
@@ -265,9 +276,9 @@ export function ExportPage() {
               <CardDescription>Or select by project</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="max-h-48 space-y-2 overflow-y-auto">
+              <div className="max-h-48 space-y-2 overflow-y-auto scrollbar-thin">
                 {projects.length === 0 ? (
-                  <p className="text-sm text-gray-500">No projects found</p>
+                  <p className="text-sm text-slate-500">No projects found</p>
                 ) : (
                   projects.map((project) => (
                     <div key={project.id} className="flex items-center">
@@ -288,7 +299,7 @@ export function ExportPage() {
         {/* Export Options & Preview */}
         <div className="space-y-6 lg:col-span-2">
           {/* Export Format Selection */}
-          <Card>
+          <Card className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
             <CardHeader>
               <CardTitle className="text-base">Export Format</CardTitle>
               <CardDescription>Choose the output format</CardDescription>
@@ -299,19 +310,23 @@ export function ExportPage() {
                   <button
                     key={option.id}
                     onClick={() => setSelectedExport(option.id)}
-                    className={`flex flex-col items-start rounded-lg border p-4 text-left transition-colors ${
+                    className={`flex flex-col items-start rounded-xl border p-4 text-left transition-all duration-200 ${
                       selectedExport === option.id
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                        : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                        ? 'border-primary-500/50 bg-primary-500/10'
+                        : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600/50 hover:bg-slate-800/50'
                     }`}
                   >
                     <option.icon
                       className={`mb-2 h-5 w-5 ${
-                        selectedExport === option.id ? 'text-primary-600' : 'text-gray-400'
+                        selectedExport === option.id ? 'text-primary-400' : 'text-slate-400'
                       }`}
                     />
-                    <span className="font-medium text-gray-900 dark:text-white">{option.name}</span>
-                    <span className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <span className={`font-medium ${
+                      selectedExport === option.id ? 'text-white' : 'text-slate-300'
+                    }`}>
+                      {option.name}
+                    </span>
+                    <span className="mt-1 text-xs text-slate-500">
                       {option.description}
                     </span>
                   </button>
@@ -328,7 +343,7 @@ export function ExportPage() {
 
           {/* Export Preview */}
           {exportContent && (
-            <Card>
+            <Card className="animate-fade-in">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">Export Preview</CardTitle>
@@ -354,7 +369,7 @@ export function ExportPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <pre className="max-h-96 overflow-auto rounded-lg bg-gray-900 p-4 text-sm text-gray-100">
+                <pre className="max-h-96 overflow-auto rounded-xl bg-slate-950 border border-slate-800 p-4 text-sm text-slate-300 font-mono">
                   <code>{exportContent}</code>
                 </pre>
               </CardContent>

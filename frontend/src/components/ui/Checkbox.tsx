@@ -16,17 +16,22 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
             id={id}
             ref={ref}
             className={cn(
-              'peer h-4 w-4 shrink-0 appearance-none rounded border border-gray-300 bg-white checked:border-primary-600 checked:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:checked:border-primary-500 dark:checked:bg-primary-500',
+              'peer h-5 w-5 shrink-0 appearance-none rounded-md border border-slate-600/50 bg-slate-800/50',
+              'checked:border-primary-500 checked:bg-primary-600',
+              'focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:ring-offset-0',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              'hover:border-slate-500/50 hover:bg-slate-800/70',
+              'transition-all duration-200',
               className
             )}
             {...props}
           />
-          <Check className="pointer-events-none absolute left-0 h-4 w-4 text-white opacity-0 peer-checked:opacity-100" />
+          <Check className="pointer-events-none absolute left-0.5 h-4 w-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
         </div>
         {label && (
           <label
             htmlFor={id}
-            className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="ml-2.5 text-sm text-slate-300 cursor-pointer hover:text-white transition-colors"
           >
             {label}
           </label>

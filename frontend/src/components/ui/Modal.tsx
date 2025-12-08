@@ -1,7 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from './Button';
 
 interface ModalProps {
   isOpen: boolean;
@@ -38,10 +37,10 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -49,31 +48,29 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       {/* Modal */}
       <div
         className={cn(
-          'relative z-50 w-full rounded-lg bg-white shadow-xl dark:bg-gray-800',
+          'relative z-50 w-full rounded-2xl glass-card shadow-2xl shadow-primary-500/10 animate-scale-in',
           sizeClasses[size],
-          'mx-4 max-h-[90vh] overflow-hidden'
+          'max-h-[90vh] overflow-hidden'
         )}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+        <div className="flex items-center justify-between border-b border-slate-700/50 px-6 py-4">
           <h2
             id="modal-title"
-            className="text-lg font-semibold text-gray-900 dark:text-white"
+            className="text-lg font-semibold text-white"
           >
             {title}
           </h2>
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={onClose}
-            className="h-8 w-8"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
             aria-label="Close modal"
           >
-            <X className="h-4 w-4" />
-          </Button>
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Content */}

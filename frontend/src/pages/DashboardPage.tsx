@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Domain } from '../types';
 import { getDomains, createDomain, deleteDomain, activateDomain, deactivateDomain, checkRedirect, RedirectCheckResult } from '../api/domains';
@@ -10,6 +10,8 @@ export default function DashboardPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [checkingDomains, setCheckingDomains] = useState<Set<number>>(new Set());
   const [checkResults, setCheckResults] = useState<Record<number, RedirectCheckResult>>({});
+  const [expandedDomain, setExpandedDomain] = useState<number | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
   const loadDomains = async () => {
     try {
@@ -54,13 +56,18 @@ export default function DashboardPage() {
     try {
       const result = await checkRedirect(domain.id);
       setCheckResults((prev) => ({ ...prev, [domain.id]: result }));
+      // Auto-expand if path-specific mode with results
+      if (result.mode === 'path-specific' && result.results.length > 0) {
+        setExpandedDomain(domain.id);
+      }
     } catch (err: any) {
       setCheckResults((prev) => ({
         ...prev,
         [domain.id]: {
+          mode: 'full',
           status: 'error',
-          redirecting: false,
-          message: 'Failed to check redirect'
+          message: 'Failed to check redirect',
+          results: []
         }
       }));
     } finally {
@@ -70,6 +77,16 @@ export default function DashboardPage() {
         return next;
       });
     }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedUrl(text);
+    setTimeout(() => setCopiedUrl(null), 2000);
+  };
+
+  const toggleExpand = (domainId: number) => {
+    setExpandedDomain(expandedDomain === domainId ? null : domainId);
   };
 
   if (isLoading) {
@@ -134,7 +151,8 @@ export default function DashboardPage() {
             </thead>
             <tbody className="divide-y divide-gray-700">
               {domains.map((domain) => (
-                <tr key={domain.id} className="hover:bg-gray-750">
+                <React.Fragment key={domain.id}>
+                <tr className="hover:bg-gray-750">
                   <td className="px-6 py-4">
                     <Link
                       to={`/domain/${domain.id}`}
@@ -177,10 +195,8 @@ export default function DashboardPage() {
                       <div className="flex items-center space-x-2">
                         <span
                           className={`w-2 h-2 rounded-full ${
-                            checkResults[domain.id].status === 'ok' && checkResults[domain.id].matchesTarget
+                            checkResults[domain.id].status === 'ok'
                               ? 'bg-green-500'
-                              : checkResults[domain.id].status === 'ok'
-                              ? 'bg-yellow-500'
                               : checkResults[domain.id].status === 'warning'
                               ? 'bg-yellow-500'
                               : 'bg-red-500'
@@ -191,8 +207,16 @@ export default function DashboardPage() {
                           className="text-gray-400 hover:text-white text-xs underline"
                           title={checkResults[domain.id].message}
                         >
-                          {checkResults[domain.id].statusCode || (checkResults[domain.id].status === 'error' ? 'Error' : '?')}
+                          {checkResults[domain.id].message}
                         </button>
+                        {checkResults[domain.id].results.length > 0 && (
+                          <button
+                            onClick={() => toggleExpand(domain.id)}
+                            className="text-gray-400 hover:text-white ml-1"
+                          >
+                            {expandedDomain === domain.id ? '▼' : '▶'}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <button
@@ -218,6 +242,66 @@ export default function DashboardPage() {
                     </button>
                   </td>
                 </tr>
+                {/* Expandable results row */}
+                {expandedDomain === domain.id && checkResults[domain.id]?.results.length > 0 && (
+                  <tr className="bg-gray-850">
+                    <td colSpan={7} className="px-6 py-4">
+                      <div className="bg-gray-900 rounded-lg p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-sm font-medium text-gray-300">
+                            Redirect Check Results ({checkResults[domain.id].results.length} paths)
+                          </h4>
+                          <button
+                            onClick={() => {
+                              const urls = checkResults[domain.id].results.map(r => r.url).join('\n');
+                              copyToClipboard(urls);
+                            }}
+                            className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
+                          >
+                            Copy All URLs
+                          </button>
+                        </div>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {checkResults[domain.id].results.map((result, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between bg-gray-800 rounded px-3 py-2 text-sm"
+                            >
+                              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                <span
+                                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                    result.status === 'ok'
+                                      ? 'bg-green-500'
+                                      : result.status === 'warning'
+                                      ? 'bg-yellow-500'
+                                      : 'bg-red-500'
+                                  }`}
+                                />
+                                <span className="text-gray-400 truncate" title={result.url}>
+                                  {result.path}
+                                </span>
+                                <span className="text-gray-500 text-xs truncate">
+                                  {result.message}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => copyToClipboard(result.url)}
+                                className={`ml-2 text-xs px-2 py-1 rounded flex-shrink-0 ${
+                                  copiedUrl === result.url
+                                    ? 'bg-green-700 text-green-200'
+                                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                                }`}
+                              >
+                                {copiedUrl === result.url ? 'Copied!' : 'Copy'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

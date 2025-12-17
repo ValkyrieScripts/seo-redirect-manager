@@ -44,14 +44,24 @@ export async function deactivateDomain(id: number): Promise<Domain> {
   return response.data;
 }
 
-export interface RedirectCheckResult {
+export interface PathCheckResult {
+  url: string;
+  path: string;
   status: 'ok' | 'warning' | 'error';
   redirecting: boolean;
   statusCode?: number;
   redirectUrl?: string;
-  targetUrl?: string;
   matchesTarget?: boolean;
   message: string;
+}
+
+export interface RedirectCheckResult {
+  mode: 'full' | 'path-specific';
+  status: 'ok' | 'warning' | 'error';
+  message: string;
+  totalPaths?: number;
+  checkedPaths?: number;
+  results: PathCheckResult[];
 }
 
 export async function checkRedirect(id: number): Promise<RedirectCheckResult> {

@@ -194,22 +194,21 @@ router.post('/:id/deactivate', authenticateToken, async (req: AuthRequest, res: 
   res.json(domain);
 });
 
-// Check redirect status for a domain
-router.get('/:id/check-redirect', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const domain = db.prepare('SELECT * FROM domains WHERE id = ?').get(req.params.id) as Domain | undefined;
-
-  if (!domain) {
-    return res.status(404).json({ error: 'Domain not found' });
-  }
-
+// Helper function to check a single URL
+async function checkSingleUrl(url: string, targetUrl: string): Promise<{
+  url: string;
+  status: 'ok' | 'warning' | 'error';
+  redirecting: boolean;
+  statusCode?: number;
+  redirectUrl?: string;
+  matchesTarget?: boolean;
+  message: string;
+}> {
   try {
-    // Test the domain by making a request and checking the redirect
-    const testUrl = `http://${domain.domain_name}/`;
-
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(testUrl, {
+    const response = await fetch(url, {
       method: 'HEAD',
       redirect: 'manual',
       signal: controller.signal,
@@ -223,57 +222,137 @@ router.get('/:id/check-redirect', authenticateToken, async (req: AuthRequest, re
     const locationHeader = response.headers.get('location');
     const statusCode = response.status;
 
-    // Check if it's a redirect
     if (statusCode >= 300 && statusCode < 400 && locationHeader) {
-      const redirectsToTarget = locationHeader.startsWith(domain.target_url);
-
-      res.json({
-        status: 'ok',
+      const matchesTarget = locationHeader.startsWith(targetUrl);
+      return {
+        url,
+        status: matchesTarget ? 'ok' : 'warning',
         redirecting: true,
         statusCode,
         redirectUrl: locationHeader,
-        targetUrl: domain.target_url,
-        matchesTarget: redirectsToTarget,
-        message: redirectsToTarget
-          ? `Redirecting correctly to ${locationHeader}`
-          : `Redirecting to ${locationHeader} (expected: ${domain.target_url})`
-      });
+        matchesTarget,
+        message: matchesTarget
+          ? `301 → ${locationHeader}`
+          : `301 → ${locationHeader} (expected: ${targetUrl})`
+      };
     } else if (statusCode === 200) {
-      res.json({
+      return {
+        url,
         status: 'warning',
         redirecting: false,
         statusCode,
-        message: 'Domain is responding but not redirecting (200 OK)'
-      });
+        message: '200 OK (not redirecting)'
+      };
     } else if (statusCode === 404) {
-      res.json({
+      return {
+        url,
         status: 'warning',
         redirecting: false,
         statusCode,
-        message: 'Domain returns 404 (may be inactive or path-specific mode)'
-      });
+        message: '404 Not Found'
+      };
     } else {
-      res.json({
+      return {
+        url,
         status: 'warning',
         redirecting: false,
         statusCode,
-        message: `Unexpected status code: ${statusCode}`
-      });
+        message: `Status ${statusCode}`
+      };
     }
   } catch (err: any) {
     if (err.name === 'AbortError') {
-      res.json({
+      return {
+        url,
         status: 'error',
         redirecting: false,
-        message: 'Request timed out - domain may not be configured or DNS not pointing to server'
-      });
+        message: 'Timeout - DNS or server not configured'
+      };
     } else {
-      res.json({
+      return {
+        url,
         status: 'error',
         redirecting: false,
-        message: `Connection failed: ${err.message}`
+        message: `Error: ${err.message}`
+      };
+    }
+  }
+}
+
+// Check redirect status for a domain
+router.get('/:id/check-redirect', authenticateToken, async (req: AuthRequest, res: Response) => {
+  const domain = db.prepare('SELECT * FROM domains WHERE id = ?').get(req.params.id) as Domain | undefined;
+
+  if (!domain) {
+    return res.status(404).json({ error: 'Domain not found' });
+  }
+
+  const results: Array<{
+    url: string;
+    path: string;
+    status: 'ok' | 'warning' | 'error';
+    redirecting: boolean;
+    statusCode?: number;
+    redirectUrl?: string;
+    matchesTarget?: boolean;
+    message: string;
+  }> = [];
+
+  if (domain.redirect_mode === 'path-specific') {
+    // Get unique paths from backlinks
+    const backlinks = db.prepare(`
+      SELECT DISTINCT url_path FROM backlinks WHERE domain_id = ?
+    `).all(domain.id) as { url_path: string }[];
+
+    if (backlinks.length === 0) {
+      return res.json({
+        mode: 'path-specific',
+        status: 'warning',
+        message: 'No backlinks imported yet',
+        results: []
       });
     }
+
+    // Check each unique path (limit to first 10 to avoid timeout)
+    const pathsToCheck = backlinks.slice(0, 10);
+
+    for (const { url_path } of pathsToCheck) {
+      const testUrl = `http://${domain.domain_name}${url_path}`;
+      const result = await checkSingleUrl(testUrl, domain.target_url);
+      results.push({
+        ...result,
+        path: url_path
+      });
+    }
+
+    // Determine overall status
+    const allOk = results.every(r => r.status === 'ok');
+    const anyError = results.some(r => r.status === 'error');
+    const okCount = results.filter(r => r.status === 'ok').length;
+
+    res.json({
+      mode: 'path-specific',
+      status: anyError ? 'error' : allOk ? 'ok' : 'warning',
+      message: `${okCount}/${results.length} paths redirecting correctly`,
+      totalPaths: backlinks.length,
+      checkedPaths: pathsToCheck.length,
+      results
+    });
+  } else {
+    // Full domain mode - just check root
+    const testUrl = `http://${domain.domain_name}/`;
+    const result = await checkSingleUrl(testUrl, domain.target_url);
+    results.push({
+      ...result,
+      path: '/'
+    });
+
+    res.json({
+      mode: 'full',
+      status: result.status,
+      message: result.message,
+      results
+    });
   }
 });
 

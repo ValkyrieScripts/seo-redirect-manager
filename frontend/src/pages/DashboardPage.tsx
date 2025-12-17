@@ -4,27 +4,14 @@ import { Domain } from '../types';
 import { getDomains, createDomain, deleteDomain, activateDomain, deactivateDomain, checkRedirect, RedirectCheckResult } from '../api/domains';
 import { importBacklinks } from '../api/backlinks';
 
-// Format date to relative time or short date
+// Format date to exact date
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffHours === 0) {
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      return diffMins <= 1 ? 'Just now' : `${diffMins}m ago`;
-    }
-    return `${diffHours}h ago`;
-  } else if (diffDays === 1) {
-    return 'Yesterday';
-  } else if (diffDays < 7) {
-    return `${diffDays}d ago`;
-  } else {
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
 }
 
 export default function DashboardPage() {
@@ -181,12 +168,14 @@ export default function DashboardPage() {
                 <React.Fragment key={domain.id}>
                 <tr className="hover:bg-gray-750">
                   <td className="px-6 py-4">
-                    <Link
-                      to={`/domain/${domain.id}`}
+                    <a
+                      href={`https://${domain.domain_name}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-blue-400 hover:text-blue-300 font-medium"
                     >
                       {domain.domain_name}
-                    </Link>
+                    </a>
                   </td>
                   <td className="px-6 py-4 text-gray-300 text-sm truncate max-w-xs">
                     {domain.target_url}

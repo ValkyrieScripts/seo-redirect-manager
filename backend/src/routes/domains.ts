@@ -194,4 +194,87 @@ router.post('/:id/deactivate', authenticateToken, async (req: AuthRequest, res: 
   res.json(domain);
 });
 
+// Check redirect status for a domain
+router.get('/:id/check-redirect', authenticateToken, async (req: AuthRequest, res: Response) => {
+  const domain = db.prepare('SELECT * FROM domains WHERE id = ?').get(req.params.id) as Domain | undefined;
+
+  if (!domain) {
+    return res.status(404).json({ error: 'Domain not found' });
+  }
+
+  try {
+    // Test the domain by making a request and checking the redirect
+    const testUrl = `http://${domain.domain_name}/`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(testUrl, {
+      method: 'HEAD',
+      redirect: 'manual',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; RedirectChecker/1.0)'
+      }
+    });
+
+    clearTimeout(timeout);
+
+    const locationHeader = response.headers.get('location');
+    const statusCode = response.status;
+
+    // Check if it's a redirect
+    if (statusCode >= 300 && statusCode < 400 && locationHeader) {
+      const redirectsToTarget = locationHeader.startsWith(domain.target_url);
+
+      res.json({
+        status: 'ok',
+        redirecting: true,
+        statusCode,
+        redirectUrl: locationHeader,
+        targetUrl: domain.target_url,
+        matchesTarget: redirectsToTarget,
+        message: redirectsToTarget
+          ? `Redirecting correctly to ${locationHeader}`
+          : `Redirecting to ${locationHeader} (expected: ${domain.target_url})`
+      });
+    } else if (statusCode === 200) {
+      res.json({
+        status: 'warning',
+        redirecting: false,
+        statusCode,
+        message: 'Domain is responding but not redirecting (200 OK)'
+      });
+    } else if (statusCode === 404) {
+      res.json({
+        status: 'warning',
+        redirecting: false,
+        statusCode,
+        message: 'Domain returns 404 (may be inactive or path-specific mode)'
+      });
+    } else {
+      res.json({
+        status: 'warning',
+        redirecting: false,
+        statusCode,
+        message: `Unexpected status code: ${statusCode}`
+      });
+    }
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      res.json({
+        status: 'error',
+        redirecting: false,
+        message: 'Request timed out - domain may not be configured or DNS not pointing to server'
+      });
+    } else {
+      res.json({
+        status: 'error',
+        redirecting: false,
+        message: `Connection failed: ${err.message}`
+      });
+    }
+  }
+});
+
 export default router;

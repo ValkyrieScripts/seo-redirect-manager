@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Domain } from '../types';
-import { getDomains, createDomain, deleteDomain, activateDomain, deactivateDomain } from '../api/domains';
+import { getDomains, createDomain, deleteDomain, activateDomain, deactivateDomain, checkRedirect, RedirectCheckResult } from '../api/domains';
 
 export default function DashboardPage() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [checkingDomains, setCheckingDomains] = useState<Set<number>>(new Set());
+  const [checkResults, setCheckResults] = useState<Record<number, RedirectCheckResult>>({});
 
   const loadDomains = async () => {
     try {
@@ -44,6 +46,29 @@ export default function DashboardPage() {
       setDomains(domains.map((d) => (d.id === domain.id ? { ...d, ...updated } : d)));
     } catch (err: any) {
       setError('Failed to update domain status');
+    }
+  };
+
+  const handleCheckRedirect = async (domain: Domain) => {
+    setCheckingDomains((prev) => new Set([...prev, domain.id]));
+    try {
+      const result = await checkRedirect(domain.id);
+      setCheckResults((prev) => ({ ...prev, [domain.id]: result }));
+    } catch (err: any) {
+      setCheckResults((prev) => ({
+        ...prev,
+        [domain.id]: {
+          status: 'error',
+          redirecting: false,
+          message: 'Failed to check redirect'
+        }
+      }));
+    } finally {
+      setCheckingDomains((prev) => {
+        const next = new Set(prev);
+        next.delete(domain.id);
+        return next;
+      });
     }
   };
 
@@ -99,6 +124,9 @@ export default function DashboardPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Status
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Redirect
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Actions
                 </th>
@@ -141,6 +169,39 @@ export default function DashboardPage() {
                     >
                       {domain.status}
                     </button>
+                  </td>
+                  <td className="px-6 py-4">
+                    {checkingDomains.has(domain.id) ? (
+                      <span className="text-gray-400 text-xs">Checking...</span>
+                    ) : checkResults[domain.id] ? (
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            checkResults[domain.id].status === 'ok' && checkResults[domain.id].matchesTarget
+                              ? 'bg-green-500'
+                              : checkResults[domain.id].status === 'ok'
+                              ? 'bg-yellow-500'
+                              : checkResults[domain.id].status === 'warning'
+                              ? 'bg-yellow-500'
+                              : 'bg-red-500'
+                          }`}
+                        />
+                        <button
+                          onClick={() => handleCheckRedirect(domain)}
+                          className="text-gray-400 hover:text-white text-xs underline"
+                          title={checkResults[domain.id].message}
+                        >
+                          {checkResults[domain.id].statusCode || (checkResults[domain.id].status === 'error' ? 'Error' : '?')}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleCheckRedirect(domain)}
+                        className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
+                      >
+                        Check
+                      </button>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <Link
@@ -280,7 +341,7 @@ function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
 
           <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-3 mb-4">
             <p className="text-yellow-200 text-sm">
-              <strong>Important:</strong> Set SSL/TLS mode to <span className="font-mono bg-yellow-900/50 px-1 rounded">Full</span> in Cloudflare SSL/TLS settings.
+              <strong>Important:</strong> Set SSL/TLS mode to <span className="font-mono bg-yellow-900/50 px-1 rounded">Flexible</span> in Cloudflare SSL/TLS settings.
             </p>
           </div>
 

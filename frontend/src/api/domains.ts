@@ -43,3 +43,18 @@ export async function deactivateDomain(id: number): Promise<Domain> {
   const response = await client.post<Domain>(`/domains/${id}/deactivate`);
   return response.data;
 }
+
+export interface RedirectCheckResult {
+  status: 'ok' | 'warning' | 'error';
+  redirecting: boolean;
+  statusCode?: number;
+  redirectUrl?: string;
+  targetUrl?: string;
+  matchesTarget?: boolean;
+  message: string;
+}
+
+export async function checkRedirect(id: number): Promise<RedirectCheckResult> {
+  const response = await client.get<RedirectCheckResult>(`/domains/${id}/check-redirect`);
+  return response.data;
+}

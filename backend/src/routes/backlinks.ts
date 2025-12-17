@@ -101,6 +101,17 @@ router.post('/import', authenticateToken, async (req: AuthRequest, res: Response
       continue;
     }
 
+    // Extract path from URL if full URL was provided
+    if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
+      try {
+        const parsedUrl = new URL(urlPath);
+        urlPath = parsedUrl.pathname + parsedUrl.search + parsedUrl.hash;
+      } catch {
+        errors.push(`Line ${i + 1}: Invalid URL in path column`);
+        continue;
+      }
+    }
+
     // Normalize path (ensure it starts with /)
     if (!urlPath.startsWith('/')) {
       urlPath = '/' + urlPath;

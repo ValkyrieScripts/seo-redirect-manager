@@ -29,9 +29,11 @@ FEATURES
 - Full Domain Redirect: All paths redirect to target URL
 - Path-Specific Redirect: Only backlink paths redirect (more control)
 - SEO Tool Blocking: Returns 404 to Ahrefs, Moz, SEMrush, etc.
-- Backlink Import: Paste CSV format (linking_url,path)
-- Cloudflare Integration: Masks origin IP from detection
-- Dark theme dashboard with instructions
+- Backlink Import: Paste CSV format during domain creation or later
+- Auto-extract paths: Full URLs in CSV are automatically parsed
+- Redirect Status Check: Test if redirects are working correctly
+- Cloudflare Integration: Masks origin IP from detection (recommended)
+- Dark theme dashboard with setup instructions
 
 
 TYPICAL WORKFLOW
@@ -46,6 +48,7 @@ TYPICAL WORKFLOW
    - Choose redirect mode:
      * Full Domain: All paths redirect
      * Path-Specific: Only imported backlink paths redirect
+   - If Path-Specific: Paste your backlinks (CSV format) right away
    - Click Add
 
 3. Configure Cloudflare DNS
@@ -67,8 +70,13 @@ TYPICAL WORKFLOW
    - Toggle status to "Active"
    - Nginx config is auto-generated
 
-6. Send linking URLs to indexer
-   - Copy linking URLs from dashboard
+6. Test redirects
+   - Click "Check" on dashboard or "Test Redirects" on domain detail page
+   - Verify all paths return 301 to correct target URL
+   - Green = working, Yellow = warning, Red = error
+
+7. Send linking URLs to indexer
+   - Copy linking URLs from domain detail page
    - Submit to Google Search Console or indexing service
    - This triggers Google to re-crawl and discover the redirect
 
@@ -83,8 +91,12 @@ Examples:
   https://news-site.org/article-title,/another-page
   https://forum.net/thread,/
 
+You can also paste full URLs - paths are auto-extracted:
+  https://blog.example.com/post,https://expired-domain.com/old-page
+  (automatically extracts /old-page as the path)
+
 - linking_url: Full URL of page containing backlink (for indexing)
-- path: Path on expired domain that the backlink points to
+- path: Path on expired domain (or full URL - will be parsed)
 
 
 REDIRECT MODES
@@ -188,6 +200,7 @@ Domains:
   DELETE /api/domains/:id        - Delete domain
   POST   /api/domains/:id/activate   - Activate domain
   POST   /api/domains/:id/deactivate - Deactivate domain
+  GET    /api/domains/:id/check-redirect - Test redirect status
 
 Backlinks:
   GET    /api/backlinks/:domain_id         - Get all backlinks
@@ -226,6 +239,23 @@ For each redirect domain:
 
    Why Flexible? Our server only serves HTTP on port 80.
    Cloudflare handles HTTPS for visitors.
+
+WHY USE CLOUDFLARE?
+-------------------
+Using Cloudflare proxy is recommended because:
+
+1. Hides origin IP pattern - Without Cloudflare, Google sees all your
+   expired domains resolving to the same IP (89.147.108.50). This pattern
+   could trigger detection and devalue the links.
+
+2. Free HTTPS - Backlinks may use https:// URLs. Cloudflare provides
+   SSL certificates automatically.
+
+3. Masks infrastructure - SEO tools only see Cloudflare, not your server.
+
+If you point directly to VPS without Cloudflare:
+- All domains resolve to same IP (easier to detect as redirect farm)
+- You'd need to set up SSL certificates manually for each domain
 
 
 LOGIN CREDENTIALS

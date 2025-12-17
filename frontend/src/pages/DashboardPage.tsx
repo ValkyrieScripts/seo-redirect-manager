@@ -4,6 +4,29 @@ import { Domain } from '../types';
 import { getDomains, createDomain, deleteDomain, activateDomain, deactivateDomain, checkRedirect, RedirectCheckResult } from '../api/domains';
 import { importBacklinks } from '../api/backlinks';
 
+// Format date to relative time or short date
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours === 0) {
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      return diffMins <= 1 ? 'Just now' : `${diffMins}m ago`;
+    }
+    return `${diffHours}h ago`;
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  } else {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+}
+
 export default function DashboardPage() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -145,6 +168,9 @@ export default function DashboardPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Redirect
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Updated
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Actions
                 </th>
@@ -228,6 +254,9 @@ export default function DashboardPage() {
                       </button>
                     )}
                   </td>
+                  <td className="px-6 py-4 text-gray-400 text-sm" title={domain.updated_at}>
+                    {formatDate(domain.updated_at)}
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <Link
                       to={`/domain/${domain.id}`}
@@ -246,7 +275,7 @@ export default function DashboardPage() {
                 {/* Expandable results row */}
                 {expandedDomain === domain.id && checkResults[domain.id]?.results.length > 0 && (
                   <tr className="bg-gray-850">
-                    <td colSpan={7} className="px-6 py-4">
+                    <td colSpan={8} className="px-6 py-4">
                       <div className="bg-gray-900 rounded-lg p-4">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="text-sm font-medium text-gray-300">

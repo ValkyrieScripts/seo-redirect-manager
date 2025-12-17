@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { DomainWithBacklinks, Backlink } from '../types';
-import { getDomain, updateDomain, activateDomain, deactivateDomain, deleteDomain } from '../api/domains';
+import { getDomain, updateDomain, activateDomain, deactivateDomain, deleteDomain, checkRedirect, RedirectCheckResult } from '../api/domains';
 import { importBacklinks, deleteBacklink, deleteAllBacklinks } from '../api/backlinks';
 
 export default function DomainDetailPage() {
@@ -12,6 +12,9 @@ export default function DomainDetailPage() {
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [checkResult, setCheckResult] = useState<RedirectCheckResult | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
   const loadDomain = async () => {
     if (!id) return;
@@ -82,6 +85,21 @@ export default function DomainDetailPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+    setCopiedUrl(text);
+    setTimeout(() => setCopiedUrl(null), 2000);
+  };
+
+  const handleCheckRedirects = async () => {
+    if (!domain) return;
+    setIsChecking(true);
+    try {
+      const result = await checkRedirect(domain.id);
+      setCheckResult(result);
+    } catch (err: any) {
+      setError('Failed to check redirects');
+    } finally {
+      setIsChecking(false);
+    }
   };
 
   if (isLoading) {
@@ -91,15 +109,6 @@ export default function DomainDetailPage() {
   if (!domain) {
     return <div className="text-red-400">Domain not found</div>;
   }
-
-  // Group backlinks by path
-  const groupedBacklinks: { [path: string]: Backlink[] } = {};
-  domain.backlinks.forEach((backlink) => {
-    if (!groupedBacklinks[backlink.url_path]) {
-      groupedBacklinks[backlink.url_path] = [];
-    }
-    groupedBacklinks[backlink.url_path].push(backlink);
-  });
 
   return (
     <div>
@@ -182,22 +191,36 @@ export default function DomainDetailPage() {
             <p className="text-green-400">@ → 89.147.108.50 (Proxied)</p>
             <p className="text-green-400">www → 89.147.108.50 (Proxied)</p>
           </div>
-          <p className="text-gray-400 mt-3">SSL/TLS Mode: Full</p>
+          <p className="text-yellow-400 mt-3">SSL/TLS Mode: Flexible (Important!)</p>
         </div>
       </div>
 
       {/* Backlinks Section */}
       <div className="bg-gray-800 rounded-lg p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-white">Backlinks</h2>
-          <div className="space-x-3">
+          <h2 className="text-lg font-bold text-white">
+            Backlinks
             {domain.backlinks.length > 0 && (
-              <button
-                onClick={handleClearAllBacklinks}
-                className="px-3 py-1 text-red-400 hover:text-red-300 text-sm"
-              >
-                Clear All
-              </button>
+              <span className="ml-2 text-gray-400 font-normal text-sm">({domain.backlinks.length})</span>
+            )}
+          </h2>
+          <div className="flex items-center space-x-3">
+            {domain.backlinks.length > 0 && (
+              <>
+                <button
+                  onClick={handleCheckRedirects}
+                  disabled={isChecking}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded-md text-sm"
+                >
+                  {isChecking ? 'Checking...' : 'Test Redirects'}
+                </button>
+                <button
+                  onClick={handleClearAllBacklinks}
+                  className="px-3 py-1 text-red-400 hover:text-red-300 text-sm"
+                >
+                  Clear All
+                </button>
+              </>
             )}
             <button
               onClick={() => setShowImportModal(true)}
@@ -207,6 +230,58 @@ export default function DomainDetailPage() {
             </button>
           </div>
         </div>
+
+        {/* Check Results */}
+        {checkResult && (
+          <div className={`mb-4 p-4 rounded-lg border ${
+            checkResult.status === 'ok'
+              ? 'bg-green-900/30 border-green-600'
+              : checkResult.status === 'warning'
+              ? 'bg-yellow-900/30 border-yellow-600'
+              : 'bg-red-900/30 border-red-600'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`font-medium ${
+                checkResult.status === 'ok' ? 'text-green-200' :
+                checkResult.status === 'warning' ? 'text-yellow-200' : 'text-red-200'
+              }`}>
+                {checkResult.message}
+              </span>
+              <button
+                onClick={() => setCheckResult(null)}
+                className="text-gray-400 hover:text-white text-sm"
+              >
+                Dismiss
+              </button>
+            </div>
+            {checkResult.results.length > 0 && (
+              <div className="space-y-2 mt-3">
+                {checkResult.results.map((result, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-gray-800/50 rounded px-3 py-2 text-sm">
+                    <div className="flex items-center space-x-3">
+                      <span className={`w-2 h-2 rounded-full ${
+                        result.status === 'ok' ? 'bg-green-500' :
+                        result.status === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+                      }`} />
+                      <span className="text-gray-300 font-mono">{result.path}</span>
+                      <span className="text-gray-500">{result.message}</span>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(result.url)}
+                      className={`text-xs px-2 py-1 rounded ${
+                        copiedUrl === result.url
+                          ? 'bg-green-700 text-green-200'
+                          : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
+                    >
+                      {copiedUrl === result.url ? 'Copied!' : 'Copy URL'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {domain.backlinks.length === 0 ? (
           <div className="text-center py-8">
@@ -219,14 +294,15 @@ export default function DomainDetailPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {Object.entries(groupedBacklinks).map(([path, backlinks]) => (
-              <BacklinkGroup
-                key={path}
-                path={path}
-                backlinks={backlinks}
+          <div className="space-y-2">
+            {domain.backlinks.map((backlink) => (
+              <BacklinkRow
+                key={backlink.id}
+                backlink={backlink}
+                domainName={domain.domain_name}
                 onDelete={handleDeleteBacklink}
                 onCopy={copyToClipboard}
+                copiedUrl={copiedUrl}
               />
             ))}
           </div>
@@ -264,60 +340,74 @@ export default function DomainDetailPage() {
   );
 }
 
-interface BacklinkGroupProps {
-  path: string;
-  backlinks: Backlink[];
+interface BacklinkRowProps {
+  backlink: Backlink;
+  domainName: string;
   onDelete: (backlink: Backlink) => void;
   onCopy: (text: string) => void;
+  copiedUrl: string | null;
 }
 
-function BacklinkGroup({ path, backlinks, onDelete, onCopy }: BacklinkGroupProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+function BacklinkRow({ backlink, domainName, onDelete, onCopy, copiedUrl }: BacklinkRowProps) {
+  const redirectUrl = `https://${domainName}${backlink.url_path}`;
 
   return (
-    <div className="border border-gray-700 rounded-lg overflow-hidden">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-650 flex justify-between items-center text-left"
-      >
-        <div>
-          <span className="text-white font-mono">{path}</span>
-          <span className="ml-3 text-gray-400 text-sm">({backlinks.length} backlinks)</span>
+    <div className="border border-gray-700 rounded-lg p-4 hover:bg-gray-750">
+      <div className="flex flex-col space-y-3">
+        {/* Linking URL (where backlink comes from) */}
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="text-gray-500 text-xs mb-1">Backlink from:</div>
+            <a
+              href={backlink.linking_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 text-sm break-all"
+            >
+              {backlink.linking_url}
+            </a>
+          </div>
+          <button
+            onClick={() => onCopy(backlink.linking_url)}
+            className={`ml-3 text-xs px-2 py-1 rounded flex-shrink-0 ${
+              copiedUrl === backlink.linking_url
+                ? 'bg-green-700 text-green-200'
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+            }`}
+          >
+            {copiedUrl === backlink.linking_url ? 'Copied!' : 'Copy'}
+          </button>
         </div>
-        <span className="text-gray-400">{isExpanded ? '▼' : '▶'}</span>
-      </button>
 
-      {isExpanded && (
-        <div className="divide-y divide-gray-700">
-          {backlinks.map((backlink) => (
-            <div key={backlink.id} className="px-4 py-3 flex justify-between items-center hover:bg-gray-750">
-              <a
-                href={backlink.linking_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 text-sm truncate max-w-xl"
-              >
-                {backlink.linking_url}
-              </a>
-              <div className="flex items-center space-x-2 ml-4">
-                <button
-                  onClick={() => onCopy(backlink.linking_url)}
-                  className="text-gray-400 hover:text-white text-sm"
-                  title="Copy URL"
-                >
-                  Copy
-                </button>
-                <button
-                  onClick={() => onDelete(backlink)}
-                  className="text-red-400 hover:text-red-300 text-sm"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
+        {/* Path and Redirect URL */}
+        <div className="flex items-center justify-between bg-gray-900 rounded px-3 py-2">
+          <div className="flex items-center space-x-3 flex-1 min-w-0">
+            <span className="text-gray-500 text-xs">Redirects:</span>
+            <span className="text-yellow-400 font-mono text-sm">{backlink.url_path}</span>
+            <span className="text-gray-500">→</span>
+            <span className="text-green-400 font-mono text-sm truncate">Target URL</span>
+          </div>
+          <div className="flex items-center space-x-2 ml-3">
+            <button
+              onClick={() => onCopy(redirectUrl)}
+              className={`text-xs px-2 py-1 rounded ${
+                copiedUrl === redirectUrl
+                  ? 'bg-green-700 text-green-200'
+                  : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+              }`}
+              title={redirectUrl}
+            >
+              {copiedUrl === redirectUrl ? 'Copied!' : 'Copy Redirect URL'}
+            </button>
+            <button
+              onClick={() => onDelete(backlink)}
+              className="text-red-400 hover:text-red-300 text-xs"
+            >
+              Delete
+            </button>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

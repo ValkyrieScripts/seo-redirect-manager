@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Domain } from '../types';
 import { getDomains, createDomain, deleteDomain, activateDomain, deactivateDomain, checkRedirect, RedirectCheckResult } from '../api/domains';
+import { importBacklinks } from '../api/backlinks';
 
 export default function DashboardPage() {
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -334,8 +335,10 @@ function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
   const [redirectMode, setRedirectMode] = useState<'full' | 'path-specific'>('full');
   const [unmatchedBehavior, setUnmatchedBehavior] = useState<'404' | 'homepage'>('homepage');
   const [notes, setNotes] = useState('');
+  const [backlinksData, setBacklinksData] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; errors?: string[] } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -350,6 +353,17 @@ function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
         unmatched_behavior: unmatchedBehavior,
         notes: notes || undefined,
       });
+
+      // Import backlinks if provided
+      if (redirectMode === 'path-specific' && backlinksData.trim()) {
+        try {
+          const result = await importBacklinks(domain.id, backlinksData);
+          setImportResult({ imported: result.imported, errors: result.errors });
+        } catch (importErr: any) {
+          setImportResult({ imported: 0, errors: [importErr.message || 'Failed to import backlinks'] });
+        }
+      }
+
       setCreatedDomain(domain);
       setStep('instructions');
     } catch (err: any) {
@@ -369,7 +383,7 @@ function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
   if (step === 'instructions' && createdDomain) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+        <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <div className="flex items-center mb-4">
             <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center mr-3">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -383,10 +397,31 @@ function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
             <p className="text-gray-300 text-sm mb-2">
               <span className="text-gray-400">Domain:</span> <span className="text-white font-mono">{createdDomain.domain_name}</span>
             </p>
-            <p className="text-gray-300 text-sm">
+            <p className="text-gray-300 text-sm mb-2">
               <span className="text-gray-400">Target:</span> <span className="text-blue-400">{createdDomain.target_url}</span>
             </p>
+            <p className="text-gray-300 text-sm">
+              <span className="text-gray-400">Mode:</span> <span className="text-purple-400">{createdDomain.redirect_mode}</span>
+            </p>
           </div>
+
+          {importResult && (
+            <div className={`rounded-lg p-4 mb-4 ${importResult.errors && importResult.errors.length > 0 ? 'bg-yellow-900/30 border border-yellow-600' : 'bg-green-900/30 border border-green-600'}`}>
+              <p className={`text-sm font-medium ${importResult.errors && importResult.errors.length > 0 ? 'text-yellow-200' : 'text-green-200'}`}>
+                {importResult.imported} backlink{importResult.imported !== 1 ? 's' : ''} imported
+              </p>
+              {importResult.errors && importResult.errors.length > 0 && (
+                <ul className="text-yellow-300 text-xs mt-2 space-y-1">
+                  {importResult.errors.slice(0, 5).map((err, i) => (
+                    <li key={i}>• {err}</li>
+                  ))}
+                  {importResult.errors.length > 5 && (
+                    <li>• ...and {importResult.errors.length - 5} more errors</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          )}
 
           <h3 className="text-lg font-semibold text-white mb-3">Cloudflare DNS Setup</h3>
 
@@ -460,7 +495,7 @@ function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold text-white mb-4">Add Domain</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -513,19 +548,37 @@ function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
           </div>
 
           {redirectMode === 'path-specific' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
-                Unmatched Paths
-              </label>
-              <select
-                value={unmatchedBehavior}
-                onChange={(e) => setUnmatchedBehavior(e.target.value as '404' | 'homepage')}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="homepage">Redirect to target (more juice)</option>
-                <option value="404">Return 404 (cleaner)</option>
-              </select>
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Unmatched Paths
+                </label>
+                <select
+                  value={unmatchedBehavior}
+                  onChange={(e) => setUnmatchedBehavior(e.target.value as '404' | 'homepage')}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="homepage">Redirect to target (more juice)</option>
+                  <option value="404">Return 404 (cleaner)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Backlinks (CSV format)
+                </label>
+                <textarea
+                  value={backlinksData}
+                  onChange={(e) => setBacklinksData(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                  placeholder="linking_url,path_on_domain&#10;https://blog.example.com/post,/old-article&#10;https://news-site.org/article,/another-page"
+                  rows={5}
+                />
+                <p className="text-gray-500 text-xs mt-1">
+                  Format: linking_url,path (or full URL - path will be extracted)
+                </p>
+              </div>
+            </>
           )}
 
           <div>

@@ -268,7 +268,7 @@ CURRENT ACTIVE DOMAINS (as of Dec 17, 2025)
 -------------------------------------------
 All redirecting to: https://www.reddit.com/r/Progenity_PROG/
 
-Full Redirect (working):
+Full Redirect (18 working):
   https://blueplaquerebellion.com
   https://cadreamride.org
   https://manfridayuk.org
@@ -280,6 +280,13 @@ Full Redirect (working):
   https://testimonyforgod.com
   https://aids-ina.org
   https://lenafaure.com
+  https://sassforstatetreasurer.org
+  https://mrdv.org
+  https://ricksteineralaska.com
+  https://peppemerolla.com
+  https://lysosomaltx.com
+  https://missionchretienne.net
+  https://ilgiornaledipachino.com
 
 Path-Specific (working backlink URLs):
   https://lyricspremiere.com/shooter-jennings-thewhitetrashsong-lyrics.html
@@ -287,21 +294,12 @@ Path-Specific (working backlink URLs):
   https://lyricspremiere.com/hayden-panettiere-telescope-lyrics.html
   https://nysenasdaqlive.com/defence-cyber-security-market-to-grow-248-6-billion-by-2023-dell-secure-works-ibm/
 
-Needs Cloudflare cache purge (server correct, cached old redirect):
-  - sassforstatetreasurer.org
-  - mrdv.org
-  - ricksteineralaska.com
-  - peppemerolla.com
-  - lysosomaltx.com
-
 Needs Cloudflare SSL set to Flexible (403 error):
-  - dallasdvresources.org
-  - missionchretienne.net
-  - ilgiornaledipachino.com
   - further-abandonment.com
   - 5gawareness.com
 
 Needs DNS A record pointing to 89.147.108.50:
+  - dallasdvresources.org
   - icangowithout.com
   - phononstore.com
   - danielaedburg.com

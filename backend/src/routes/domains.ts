@@ -194,6 +194,44 @@ router.post('/:id/deactivate', authenticateToken, async (req: AuthRequest, res: 
   res.json(domain);
 });
 
+// Update target URL for all domains
+router.post('/bulk/update-target', authenticateToken, async (req: AuthRequest, res: Response) => {
+  const { old_target_url, new_target_url } = req.body;
+
+  if (!new_target_url) {
+    return res.status(400).json({ error: 'New target URL required' });
+  }
+
+  // Validate new target URL
+  try {
+    new URL(new_target_url);
+  } catch {
+    return res.status(400).json({ error: 'Invalid target URL' });
+  }
+
+  let query = 'UPDATE domains SET target_url = ?, updated_at = CURRENT_TIMESTAMP';
+  let params: any[] = [new_target_url];
+
+  // If old_target_url is provided, only update domains with that target
+  if (old_target_url) {
+    query += ' WHERE target_url = ?';
+    params.push(old_target_url);
+  }
+
+  const result = db.prepare(query).run(...params);
+  const updatedCount = result.changes;
+
+  // Regenerate nginx configs for all active domains
+  await generateAllNginxConfigs();
+  await reloadNginx();
+
+  res.json({
+    message: `Updated ${updatedCount} domain(s) to new target URL`,
+    updated_count: updatedCount,
+    new_target_url
+  });
+});
+
 // Helper function to check a single URL
 async function checkSingleUrl(url: string, targetUrl: string): Promise<{
   url: string;

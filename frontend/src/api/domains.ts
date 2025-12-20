@@ -68,3 +68,25 @@ export async function checkRedirect(id: number): Promise<RedirectCheckResult> {
   const response = await client.get<RedirectCheckResult>(`/domains/${id}/check-redirect`);
   return response.data;
 }
+
+export interface BulkUpdateResult {
+  message: string;
+  updated_count: number;
+  new_target_url: string;
+}
+
+export async function bulkUpdateTargetUrl(
+  newTargetUrl: string,
+  domainIds?: number[]
+): Promise<BulkUpdateResult> {
+  const response = await client.post<BulkUpdateResult>('/domains/bulk/update-target', {
+    new_target_url: newTargetUrl,
+    domain_ids: domainIds
+  });
+  return response.data;
+}
+
+export async function reloadNginx(): Promise<{ message: string }> {
+  const response = await client.post<{ message: string }>('/nginx/reload');
+  return response.data;
+}

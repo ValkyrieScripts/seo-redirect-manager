@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Domain } from '../types';
-import { getDomains, createDomain, deleteDomain, activateDomain, deactivateDomain, checkRedirect, RedirectCheckResult } from '../api/domains';
+import { getDomains, createDomain, deleteDomain, activateDomain, deactivateDomain, checkRedirect, RedirectCheckResult, bulkUpdateTargetUrl, reloadNginx } from '../api/domains';
 import { importBacklinks } from '../api/backlinks';
 
 // Format date to exact date
@@ -18,11 +18,15 @@ export default function DashboardPage() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [checkingDomains, setCheckingDomains] = useState<Set<number>>(new Set());
   const [checkResults, setCheckResults] = useState<Record<number, RedirectCheckResult>>({});
   const [expandedDomain, setExpandedDomain] = useState<number | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [selectedDomains, setSelectedDomains] = useState<Set<number>>(new Set());
+  const [showBulkTargetModal, setShowBulkTargetModal] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
 
   const loadDomains = async () => {
     try {
@@ -100,6 +104,46 @@ export default function DashboardPage() {
     setExpandedDomain(expandedDomain === domainId ? null : domainId);
   };
 
+  const toggleSelectDomain = (domainId: number) => {
+    setSelectedDomains((prev) => {
+      const next = new Set(prev);
+      if (next.has(domainId)) {
+        next.delete(domainId);
+      } else {
+        next.add(domainId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedDomains.size === domains.length) {
+      setSelectedDomains(new Set());
+    } else {
+      setSelectedDomains(new Set(domains.map((d) => d.id)));
+    }
+  };
+
+  const handlePurgeCache = async () => {
+    setIsPurging(true);
+    setError('');
+    try {
+      await reloadNginx();
+      setSuccess('Server cache purged successfully');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError('Failed to purge cache');
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
+  const handleBulkUpdateComplete = () => {
+    setShowBulkTargetModal(false);
+    setSelectedDomains(new Set());
+    loadDomains();
+  };
+
   if (isLoading) {
     return <div className="text-gray-400">Loading domains...</div>;
   }
@@ -108,17 +152,55 @@ export default function DashboardPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-white">Domains</h1>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
-        >
-          Add Domain
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={handlePurgeCache}
+            disabled={isPurging}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 text-white rounded-md transition-colors"
+          >
+            {isPurging ? 'Purging...' : 'Purge Cache'}
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+          >
+            Add Domain
+          </button>
+        </div>
       </div>
+
+      {/* Bulk Actions Bar */}
+      {selectedDomains.size > 0 && (
+        <div className="bg-blue-900/50 border border-blue-500 rounded-lg px-4 py-3 mb-4 flex items-center justify-between">
+          <span className="text-blue-200">
+            {selectedDomains.size} domain{selectedDomains.size !== 1 ? 's' : ''} selected
+          </span>
+          <div className="flex space-x-3">
+            <button
+              onClick={() => setShowBulkTargetModal(true)}
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+            >
+              Change Target URL
+            </button>
+            <button
+              onClick={() => setSelectedDomains(new Set())}
+              className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm"
+            >
+              Clear Selection
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">
           {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="bg-green-900/50 border border-green-500 text-green-200 px-4 py-3 rounded mb-4">
+          {success}
         </div>
       )}
 
@@ -137,6 +219,14 @@ export default function DashboardPage() {
           <table className="w-full">
             <thead className="bg-gray-700">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={selectedDomains.size === domains.length && domains.length > 0}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Domain
                 </th>
@@ -166,7 +256,15 @@ export default function DashboardPage() {
             <tbody className="divide-y divide-gray-700">
               {domains.map((domain) => (
                 <React.Fragment key={domain.id}>
-                <tr className="hover:bg-gray-750">
+                <tr className={`hover:bg-gray-750 ${selectedDomains.has(domain.id) ? 'bg-blue-900/20' : ''}`}>
+                  <td className="px-4 py-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedDomains.has(domain.id)}
+                      onChange={() => toggleSelectDomain(domain.id)}
+                      className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                    />
+                  </td>
                   <td className="px-6 py-4">
                     <a
                       href={`https://${domain.domain_name}`}
@@ -264,7 +362,7 @@ export default function DashboardPage() {
                 {/* Expandable results row */}
                 {expandedDomain === domain.id && checkResults[domain.id]?.results.length > 0 && (
                   <tr className="bg-gray-850">
-                    <td colSpan={8} className="px-6 py-4">
+                    <td colSpan={9} className="px-6 py-4">
                       <div className="bg-gray-900 rounded-lg p-4">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="text-sm font-medium text-gray-300">
@@ -334,6 +432,15 @@ export default function DashboardPage() {
             setDomains([domain, ...domains]);
             setShowAddModal(false);
           }}
+        />
+      )}
+
+      {showBulkTargetModal && (
+        <BulkTargetModal
+          selectedCount={selectedDomains.size}
+          selectedIds={Array.from(selectedDomains)}
+          onClose={() => setShowBulkTargetModal(false)}
+          onComplete={handleBulkUpdateComplete}
         />
       )}
     </div>
@@ -626,6 +733,84 @@ function AddDomainModal({ onClose, onAdd }: AddDomainModalProps) {
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md transition-colors"
             >
               {isLoading ? 'Adding...' : 'Add Domain'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+interface BulkTargetModalProps {
+  selectedCount: number;
+  selectedIds: number[];
+  onClose: () => void;
+  onComplete: () => void;
+}
+
+function BulkTargetModal({ selectedCount, selectedIds, onClose, onComplete }: BulkTargetModalProps) {
+  const [targetUrl, setTargetUrl] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      await bulkUpdateTargetUrl(targetUrl, selectedIds);
+      onComplete();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update domains');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold text-white mb-4">Change Target URL</h2>
+        <p className="text-gray-400 text-sm mb-4">
+          Update target URL for {selectedCount} selected domain{selectedCount !== 1 ? 's' : ''}.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded text-sm">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              New Target URL
+            </label>
+            <input
+              type="url"
+              value={targetUrl}
+              onChange={(e) => setTargetUrl(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="https://example.com/page"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md transition-colors"
+            >
+              {isLoading ? 'Updating...' : 'Update All'}
             </button>
           </div>
         </form>

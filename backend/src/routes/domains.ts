@@ -194,9 +194,9 @@ router.post('/:id/deactivate', authenticateToken, async (req: AuthRequest, res: 
   res.json(domain);
 });
 
-// Update target URL for all domains
+// Update target URL for all or selected domains
 router.post('/bulk/update-target', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { old_target_url, new_target_url } = req.body;
+  const { old_target_url, new_target_url, domain_ids } = req.body;
 
   if (!new_target_url) {
     return res.status(400).json({ error: 'New target URL required' });
@@ -212,8 +212,13 @@ router.post('/bulk/update-target', authenticateToken, async (req: AuthRequest, r
   let query = 'UPDATE domains SET target_url = ?, updated_at = CURRENT_TIMESTAMP';
   let params: any[] = [new_target_url];
 
-  // If old_target_url is provided, only update domains with that target
-  if (old_target_url) {
+  // If domain_ids is provided, only update those specific domains
+  if (domain_ids && Array.isArray(domain_ids) && domain_ids.length > 0) {
+    const placeholders = domain_ids.map(() => '?').join(',');
+    query += ` WHERE id IN (${placeholders})`;
+    params.push(...domain_ids);
+  } else if (old_target_url) {
+    // If old_target_url is provided, only update domains with that target
     query += ' WHERE target_url = ?';
     params.push(old_target_url);
   }

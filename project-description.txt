@@ -32,6 +32,9 @@ FEATURES
 - Backlink Import: Paste CSV format during domain creation or later
 - Auto-extract paths: Full URLs in CSV are automatically parsed
 - Redirect Status Check: Test if redirects are working correctly
+- Bulk Domain Selection: Select multiple domains with checkboxes
+- Bulk Target URL Update: Change target URL for selected domains at once
+- Purge Cache: Regenerate nginx configs and reload server
 - Cloudflare Integration: Masks origin IP from detection (recommended)
 - Dark theme dashboard with setup instructions
 
@@ -201,6 +204,7 @@ Domains:
   POST   /api/domains/:id/activate   - Activate domain
   POST   /api/domains/:id/deactivate - Deactivate domain
   GET    /api/domains/:id/check-redirect - Test redirect status
+  POST   /api/domains/bulk/update-target - Bulk update target URL
 
 Backlinks:
   GET    /api/backlinks/:domain_id         - Get all backlinks
@@ -268,7 +272,7 @@ CURRENT ACTIVE DOMAINS (as of Dec 20, 2025)
 -------------------------------------------
 All redirecting to: https://www.reddit.com/r/ALKRKY/
 
-Full Redirect (19 working):
+Full Redirect (23 working):
   https://blueplaquerebellion.com
   https://cadreamride.org
   https://manfridayuk.org
@@ -288,6 +292,10 @@ Full Redirect (19 working):
   https://missionchretienne.net
   https://ilgiornaledipachino.com
   https://further-abandonment.com
+  https://5gawareness.com
+  https://icangowithout.com
+  https://danielaedburg.com
+  https://aquabamboo.com
 
 Path-Specific (working backlink URLs):
   https://lyricspremiere.com/shooter-jennings-thewhitetrashsong-lyrics.html
@@ -295,15 +303,9 @@ Path-Specific (working backlink URLs):
   https://lyricspremiere.com/hayden-panettiere-telescope-lyrics.html
   https://nysenasdaqlive.com/defence-cyber-security-market-to-grow-248-6-billion-by-2023-dell-secure-works-ibm/
 
-Needs Cloudflare SSL set to Flexible (403 error):
-  - 5gawareness.com
-
 Needs DNS A record pointing to 89.147.108.50:
   - dallasdvresources.org
-  - icangowithout.com
   - phononstore.com
-  - danielaedburg.com
-  - aquabamboo.com
   - canadawaterweek.com
 
 

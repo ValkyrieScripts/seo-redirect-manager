@@ -264,11 +264,11 @@ Default: admin / 1509
 Can be changed in Settings page
 
 
-CURRENT ACTIVE DOMAINS (as of Dec 17, 2025)
+CURRENT ACTIVE DOMAINS (as of Dec 20, 2025)
 -------------------------------------------
-All redirecting to: https://www.reddit.com/r/Progenity_PROG/
+All redirecting to: https://www.reddit.com/r/ALKRKY/
 
-Full Redirect (18 working):
+Full Redirect (19 working):
   https://blueplaquerebellion.com
   https://cadreamride.org
   https://manfridayuk.org
@@ -287,6 +287,7 @@ Full Redirect (18 working):
   https://lysosomaltx.com
   https://missionchretienne.net
   https://ilgiornaledipachino.com
+  https://further-abandonment.com
 
 Path-Specific (working backlink URLs):
   https://lyricspremiere.com/shooter-jennings-thewhitetrashsong-lyrics.html
@@ -295,7 +296,6 @@ Path-Specific (working backlink URLs):
   https://nysenasdaqlive.com/defence-cyber-security-market-to-grow-248-6-billion-by-2023-dell-secure-works-ibm/
 
 Needs Cloudflare SSL set to Flexible (403 error):
-  - further-abandonment.com
   - 5gawareness.com
 
 Needs DNS A record pointing to 89.147.108.50:
